@@ -23682,6 +23682,19 @@
     ["polyline", { points: "12 6 12 12 16 14", key: "68esgv" }]
   ]);
 
+  // node_modules/lucide-react/dist/esm/icons/flask-conical.js
+  var FlaskConical = createLucideIcon("FlaskConical", [
+    [
+      "path",
+      {
+        d: "M14 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 18 22H6a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10 8V2",
+        key: "18mbvz"
+      }
+    ],
+    ["path", { d: "M6.453 15h11.094", key: "3shlmq" }],
+    ["path", { d: "M8.5 2h7", key: "csnxdl" }]
+  ]);
+
   // node_modules/lucide-react/dist/esm/icons/gauge.js
   var Gauge = createLucideIcon("Gauge", [
     ["path", { d: "m12 14 4-4", key: "9kzdfg" }],
@@ -23786,6 +23799,12 @@
     ]
   ]);
 
+  // node_modules/lucide-react/dist/esm/icons/x.js
+  var X = createLucideIcon("X", [
+    ["path", { d: "M18 6 6 18", key: "1bl5f8" }],
+    ["path", { d: "m6 6 12 12", key: "d8bk6v" }]
+  ]);
+
   // node_modules/lucide-react/dist/esm/icons/zap.js
   var Zap = createLucideIcon("Zap", [
     [
@@ -23796,6 +23815,323 @@
       }
     ]
   ]);
+
+  // lib/backtestEngine.js
+  var ES_TICK = 0.25;
+  function avgRange(bars, end, lookback = 5) {
+    const s = Math.max(0, end - lookback + 1);
+    let sum = 0;
+    let n = 0;
+    for (let j = s; j <= end; j++) {
+      if (!bars[j]) continue;
+      sum += bars[j].h - bars[j].l;
+      n++;
+    }
+    return n > 0 ? sum / n : Math.max(ES_TICK, (bars[end]?.h ?? 0) - (bars[end]?.l ?? 0));
+  }
+  function entryAttributionQuad(signal) {
+    if (!signal) return null;
+    if (signal.isFiltered) {
+      const sq = signal.smoothQuad ?? signal.quad;
+      return sq ?? null;
+    }
+    return signal.quad ?? null;
+  }
+  function spreadFloorPx(bar, execution) {
+    if (!execution.useSpreadFloor || bar == null || bar.spread == null) return 0;
+    return Math.max(0, Number(bar.spread) * 0.5);
+  }
+  function slipTicksToPx(ticks) {
+    return Math.max(0, ticks) * ES_TICK;
+  }
+  function effectiveSlippagePx(bar, execution) {
+    const user = slipTicksToPx(execution.slippageTicks ?? 0);
+    const floor = spreadFloorPx(bar, execution);
+    return Math.max(user, floor);
+  }
+  function tierRank(tier) {
+    return { NONE: 0, LOW: 1, MODERATE: 2, HIGH: 3 }[tier] ?? 0;
+  }
+  function targetToPrice(entryPrice, entryCoord, targetCoord, bars, barIdx) {
+    if (!targetCoord || !entryCoord || entryCoord.x == null || entryCoord.y == null) return null;
+    const tr = avgRange(bars, barIdx);
+    const k = tr / 10;
+    const dy = (targetCoord.y - entryCoord.y) * k;
+    const dx = (targetCoord.x - entryCoord.x) * k * 0.35;
+    return entryPrice + dy + dx;
+  }
+  function runBacktest({ bars, signals, execution, strategy }) {
+    const n = Math.min(bars.length, signals.length);
+    const initial = execution.initialBalance ?? 1e4;
+    let balance = initial;
+    const equityCurve = [];
+    const trades = [];
+    const markers = [];
+    const quadrantStats = {};
+    for (let q = 1; q <= 4; q++) {
+      quadrantStats[q] = { wins: 0, losses: 0, count: 0 };
+    }
+    let position = null;
+    let pendingEntry = null;
+    let pendingExit = false;
+    const warmup = Math.max(5, execution.warmupBars ?? 5);
+    const pushEquity = (barIdx, equity) => {
+      equityCurve.push({ barIndex: barIdx, equity });
+    };
+    const closePositionAtOpen = (barIdx) => {
+      const bar = bars[barIdx];
+      if (!position || !bar) return;
+      const slip = effectiveSlippagePx(bar, execution);
+      const px = position.side === "long" ? bar.o - slip : bar.o + slip;
+      const gross = position.side === "long" ? px - position.entryPrice : position.entryPrice - px;
+      const comm = (execution.commissionPerSide ?? 0) * 2;
+      const pnl = gross - comm;
+      balance += pnl;
+      trades.push({
+        side: position.side,
+        entryIndex: position.entryIndex,
+        exitIndex: barIdx,
+        entryPrice: position.entryPrice,
+        exitPrice: px,
+        pnl,
+        entryQuad: position.entryQuad
+      });
+      const eq = entryAttributionQuad(signals[position.decisionIndex]);
+      if (eq >= 1 && eq <= 4) {
+        const row = quadrantStats[eq];
+        row.count++;
+        if (pnl > 0) row.wins++;
+        else if (pnl < 0) row.losses++;
+      }
+      markers.push({ barIndex: barIdx, kind: "exit", side: position.side, price: px });
+      position = null;
+    };
+    const openPositionAtOpen = (barIdx) => {
+      const bar = bars[barIdx];
+      if (!pendingEntry || !bar || position) return;
+      const slip = effectiveSlippagePx(bar, execution);
+      const px = pendingEntry.side === "long" ? bar.o + slip : bar.o - slip;
+      balance -= execution.commissionPerSide ?? 0;
+      const sig = pendingEntry.decisionSignal;
+      const ec = sig?.effectiveCoord || (sig?.isFiltered ? sig?.smoothCoord : sig?.coord) || sig?.coord;
+      const tp = sig?.reversalTarget && ec ? targetToPrice(px, ec, sig.reversalTarget, bars, barIdx) : null;
+      const atr = avgRange(bars, barIdx);
+      const sl = pendingEntry.side === "long" ? px - atr * 1.25 : px + atr * 1.25;
+      const entryQuad = entryAttributionQuad(sig);
+      position = {
+        side: pendingEntry.side,
+        entryPrice: px,
+        entryIndex: barIdx,
+        decisionIndex: pendingEntry.decisionIndex,
+        tpPrice: tp,
+        slPrice: sl,
+        entryQuad
+      };
+      markers.push({ barIndex: barIdx, kind: "entry", side: pendingEntry.side, price: px });
+      pendingEntry = null;
+    };
+    for (let i = 0; i < n; i++) {
+      const bar = bars[i];
+      if (pendingExit && position) {
+        closePositionAtOpen(i);
+        pendingExit = false;
+      }
+      if (pendingEntry && !position) {
+        openPositionAtOpen(i);
+      }
+      let mtm = balance;
+      if (position) {
+        const c = bar.c;
+        const unreal = position.side === "long" ? c - position.entryPrice : position.entryPrice - c;
+        mtm = balance + unreal;
+      }
+      pushEquity(i, mtm);
+      if (i < n - 1 && i >= warmup - 1) {
+        const ctx = {
+          i,
+          bar,
+          signal: signals[i],
+          position,
+          bars,
+          signals,
+          execution
+        };
+        const decision = strategy(ctx);
+        if (position) {
+          const c = bar.c;
+          let tpSl = false;
+          if (position.side === "long") {
+            if (position.tpPrice != null && c >= position.tpPrice) tpSl = true;
+            if (position.slPrice != null && c <= position.slPrice) tpSl = true;
+          } else {
+            if (position.tpPrice != null && c <= position.tpPrice) tpSl = true;
+            if (position.slPrice != null && c >= position.slPrice) tpSl = true;
+          }
+          if (tpSl || decision.exit) {
+            pendingExit = true;
+          }
+        } else if (decision.entry && !pendingEntry) {
+          pendingEntry = {
+            side: decision.entry.side,
+            decisionSignal: { ...signals[i] },
+            decisionIndex: i
+          };
+        }
+      }
+    }
+    if (position && n > 0) {
+      const last = bars[n - 1];
+      const slip = effectiveSlippagePx(last, execution);
+      const px = position.side === "long" ? last.c - slip : last.c + slip;
+      const gross = position.side === "long" ? px - position.entryPrice : position.entryPrice - px;
+      const comm = (execution.commissionPerSide ?? 0) * 2;
+      const pnl = gross - comm;
+      balance += pnl;
+      trades.push({
+        side: position.side,
+        entryIndex: position.entryIndex,
+        exitIndex: n - 1,
+        entryPrice: position.entryPrice,
+        exitPrice: px,
+        pnl,
+        entryQuad: position.entryQuad
+      });
+      const eq = entryAttributionQuad(signals[position.decisionIndex]);
+      if (eq >= 1 && eq <= 4) {
+        const row = quadrantStats[eq];
+        row.count++;
+        if (pnl > 0) row.wins++;
+        else if (pnl < 0) row.losses++;
+      }
+      markers.push({ barIndex: n - 1, kind: "exit", side: position.side, price: px });
+    }
+    const totalReturn = initial > 0 ? (balance - initial) / initial * 100 : 0;
+    let peak = initial;
+    let maxDd = 0;
+    for (const pt of equityCurve) {
+      if (pt.equity > peak) peak = pt.equity;
+      const dd = peak > 0 ? (peak - pt.equity) / peak * 100 : 0;
+      if (dd > maxDd) maxDd = dd;
+    }
+    const wins = trades.filter((t) => t.pnl > 0).length;
+    const grossProfit = trades.filter((t) => t.pnl > 0).reduce((a, t) => a + t.pnl, 0);
+    const grossLoss = Math.abs(trades.filter((t) => t.pnl < 0).reduce((a, t) => a + t.pnl, 0));
+    const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : grossProfit > 0 ? Infinity : 0;
+    return {
+      trades,
+      equityCurve,
+      markers,
+      quadrantStats,
+      metrics: {
+        finalBalance: balance,
+        totalReturnPct: totalReturn,
+        maxDrawdownPct: maxDd,
+        tradeCount: trades.length,
+        winRate: trades.length ? wins / trades.length : 0,
+        profitFactor: Number.isFinite(profitFactor) ? profitFactor : 0,
+        avgTradePnl: trades.length ? trades.reduce((a, t) => a + t.pnl, 0) / trades.length : 0
+      }
+    };
+  }
+
+  // lib/strategyPresets.js
+  function effectiveQuadFromSignal(s) {
+    if (!s) return null;
+    return s.isFiltered ? s.smoothQuad ?? s.quad : s.quad;
+  }
+  function defaultStrategy(ctx) {
+    const { signal, position } = ctx;
+    if (!signal) return {};
+    const rev = signal.reversalTier ?? "NONE";
+    const trendT = signal.trendTier ?? "NONE";
+    const tDir = signal.trendDirection;
+    const tMode = signal.trendMode;
+    if (position) {
+      const r = tierRank(rev);
+      if (r >= 2) return { exit: true };
+      return {};
+    }
+    if (trendT !== "HIGH") return {};
+    if (!["NONE", "LOW"].includes(rev)) return {};
+    const eq = effectiveQuadFromSignal(signal);
+    if (eq !== 2 && eq !== 4) return {};
+    if (tDir === "bullish" || tMode === "bullish") {
+      return { entry: { side: "long" } };
+    }
+    if (tDir === "bearish" || tMode === "bearish") {
+      return { entry: { side: "short" } };
+    }
+    return {};
+  }
+  function meanReversionStrategy(ctx) {
+    const { signal, position } = ctx;
+    if (!signal) return {};
+    const rev = signal.reversalTier ?? "NONE";
+    const trendT = signal.trendTier ?? "NONE";
+    if (position) {
+      if (tierRank(rev) < 2 && trendT === "HIGH") return { exit: true };
+      return {};
+    }
+    if (trendT !== "LOW" && trendT !== "NONE") return {};
+    if (rev !== "HIGH") return {};
+    const dir = signal.reversalDirection;
+    if (dir === "bearish") return { entry: { side: "short" } };
+    if (dir === "bullish") return { entry: { side: "long" } };
+    return {};
+  }
+  function buildStrategy(name) {
+    if (name === "meanReversion") return meanReversionStrategy;
+    return defaultStrategy;
+  }
+
+  // lib/backtestRecommendations.js
+  function buildRecommendations(metrics, execution, trades) {
+    const out = [];
+    if (metrics.tradeCount === 0) {
+      out.push({
+        parameter: "warmup / feed length",
+        currentValue: "\u2014",
+        suggestedRange: "Let the feed run longer (detectors need ~20\u201330+ bars) or lower entry strictness in strategy.",
+        reason: "No completed trades \u2014 often warm-up or gates never satisfied."
+      });
+      return out;
+    }
+    const avg = metrics.avgTradePnl ?? 0;
+    const comm = (execution.commissionPerSide ?? 0) * 2;
+    if (avg > 0 && avg < comm * 0.5) {
+      out.push({
+        parameter: "commissionPerSide",
+        currentValue: execution.commissionPerSide,
+        suggestedRange: `Try < ${(avg / 2).toFixed(2)} per side if you model micro commissions.`,
+        reason: "Average win is smaller than round-trip commission \u2014 results are fee-dominated."
+      });
+    }
+    if (metrics.totalReturnPct > 0 && metrics.maxDrawdownPct > 35) {
+      out.push({
+        parameter: "riskFractionPerTrade",
+        currentValue: execution.riskFractionPerTrade,
+        suggestedRange: "Reduce size of line risk (when position sizing is wired) or tighten stops.",
+        reason: "High max drawdown relative to return \u2014 path risk is large."
+      });
+    }
+    if (execution.slippageTicks < 1 && metrics.winRate > 0.55 && metrics.totalReturnPct < 0) {
+      out.push({
+        parameter: "slippageTicks",
+        currentValue: execution.slippageTicks,
+        suggestedRange: "1\u20133 ticks",
+        reason: "High win rate but negative return \u2014 friction model may be too optimistic."
+      });
+    }
+    if (execution.useSpreadFloor === false) {
+      out.push({
+        parameter: "useSpreadFloor",
+        currentValue: false,
+        suggestedRange: "true",
+        reason: "REQ-FEED-02 spread is part of the feed; enabling the floor aligns fills with microstructure."
+      });
+    }
+    return out;
+  }
 
   // vwc-dynamic-matrix-filtering.jsx
   var VIEW_CANDLES = 32;
@@ -24203,8 +24539,8 @@
     const spread = TICK;
     return { bids, asks, obi, bidTot, askTot, spread, mid: midPrice };
   }
-  var ES_TICK = 0.25;
-  function roundToTick(p, tick = ES_TICK) {
+  var ES_TICK2 = 0.25;
+  function roundToTick(p, tick = ES_TICK2) {
     return Math.round(p / tick) * tick;
   }
   function randn() {
@@ -24235,11 +24571,11 @@
     if (Math.random() < gapProb + gapBoost) {
       const ticks = Math.round(randn() * gapTickSigma + rand(-1.2, 1.2));
       const clamped = Math.max(-32, Math.min(32, ticks));
-      open = roundToTick(prevClose + clamped * ES_TICK);
+      open = roundToTick(prevClose + clamped * ES_TICK2);
     } else {
-      open = roundToTick(prevClose + rand(-0.5, 0.5) * ES_TICK);
+      open = roundToTick(prevClose + rand(-0.5, 0.5) * ES_TICK2);
     }
-    const prevTR = Math.max(ES_TICK, state.lastTrueRange);
+    const prevTR = Math.max(ES_TICK2, state.lastTrueRange);
     const normScale = tfBodyScale * 9 + 0.35;
     const rangeVolSignal = Math.sqrt(Math.min(6, prevTR / normScale));
     let vf = state.volFactor * (0.84 + 0.11 * rangeVolSignal + randn() * 0.04);
@@ -24262,7 +24598,7 @@
     const isDoji = Math.random() < 0.075 && phase.id !== "ignition" && phase.id !== "bullrun" && phase.id !== "breakdown";
     const effectiveBody = isDoji ? sign * absBody * 0.11 : sign * absBody;
     let close = roundToTick(open + effectiveBody);
-    const br = Math.abs(close - open) + ES_TICK * 0.25;
+    const br = Math.abs(close - open) + ES_TICK2 * 0.25;
     const wickRoll = Math.random();
     let wu;
     let wd;
@@ -24278,8 +24614,8 @@
     }
     let high = roundToTick(Math.max(open, close) + wu);
     let low = roundToTick(Math.min(open, close) - wd);
-    if (high <= Math.max(open, close)) high = roundToTick(Math.max(open, close) + ES_TICK);
-    if (low >= Math.min(open, close)) low = roundToTick(Math.min(open, close) - ES_TICK);
+    if (high <= Math.max(open, close)) high = roundToTick(Math.max(open, close) + ES_TICK2);
+    if (low >= Math.min(open, close)) low = roundToTick(Math.min(open, close) - ES_TICK2);
     const trueRange = high - low;
     state.lastTrueRange = trueRange;
     if (close > open) state.streak = st >= 0 ? st + 1 : 1;
@@ -24301,7 +24637,7 @@
       volFactor: 1,
       momentum: 0,
       streak: 0,
-      lastTrueRange: ES_TICK * 4
+      lastTrueRange: ES_TICK2 * 4
     });
     const reset = (0, import_react3.useCallback)(() => {
       setCandles([]);
@@ -24312,7 +24648,7 @@
         volFactor: 1,
         momentum: 0,
         streak: 0,
-        lastTrueRange: ES_TICK * 4
+        lastTrueRange: ES_TICK2 * 4
       };
     }, []);
     (0, import_react3.useEffect)(() => {
@@ -24462,7 +24798,7 @@
     }, [playing, speed, phaseIdx, timeframe]);
     return { candles, phase: PHASES[phaseIdx], phaseIdx, phaseTick, reset };
   }
-  function CandleChart({ candles, smooth }) {
+  function CandleChart({ candles, smooth, tradeMarkers = [] }) {
     const view = candles.slice(-VIEW_CANDLES);
     if (view.length === 0) return /* @__PURE__ */ import_react3.default.createElement("div", { className: "h-full flex items-center justify-center text-[var(--fg-mute)] text-xs tracking-[0.3em] uppercase" }, "waiting for feed...");
     const W = 800, H = 240, PAD = 16;
@@ -24483,6 +24819,7 @@
     const scaleY = (v) => PAD + (maxH - v) / range * plotH;
     const maxVol = Math.max(...view.map((c) => c.vol));
     const slotW = plotW / VIEW_CANDLES;
+    const viewStart = candles.length - view.length;
     return /* @__PURE__ */ import_react3.default.createElement("svg", { viewBox: `0 0 ${W} ${H}`, className: "w-full h-full", preserveAspectRatio: "none" }, /* @__PURE__ */ import_react3.default.createElement("defs", null, /* @__PURE__ */ import_react3.default.createElement("linearGradient", { id: "chartBg", x1: "0", x2: "0", y1: "0", y2: "1" }, /* @__PURE__ */ import_react3.default.createElement("stop", { offset: "0%", stopColor: "#0a0b0d" }), /* @__PURE__ */ import_react3.default.createElement("stop", { offset: "100%", stopColor: "#111316" })), /* @__PURE__ */ import_react3.default.createElement("pattern", { id: "chartGrid", width: "40", height: "40", patternUnits: "userSpaceOnUse" }, /* @__PURE__ */ import_react3.default.createElement("path", { d: "M 40 0 L 0 0 0 40", fill: "none", stroke: "#1d2025", strokeWidth: "0.5" }))), /* @__PURE__ */ import_react3.default.createElement("rect", { width: W, height: H, fill: "url(#chartBg)" }), /* @__PURE__ */ import_react3.default.createElement("rect", { width: W, height: H, fill: "url(#chartGrid)", opacity: "0.6" }), [0.25, 0.5, 0.75].map((t, i) => /* @__PURE__ */ import_react3.default.createElement("g", { key: i }, /* @__PURE__ */ import_react3.default.createElement(
       "line",
       {
@@ -24542,7 +24879,107 @@
           strokeWidth: "0.7"
         }
       ), isLast && /* @__PURE__ */ import_react3.default.createElement("circle", { cx: slotX, cy: scaleY(cC), r: "2.5", fill: "#d4a84b" }, /* @__PURE__ */ import_react3.default.createElement("animate", { attributeName: "r", values: "2;5;2", dur: "1.2s", repeatCount: "indefinite" }), /* @__PURE__ */ import_react3.default.createElement("animate", { attributeName: "opacity", values: "1;0.3;1", dur: "1.2s", repeatCount: "indefinite" })));
+    }), tradeMarkers.map((m, mi) => {
+      if (m.barIndex < viewStart || m.barIndex >= candles.length) return null;
+      const vi = m.barIndex - viewStart;
+      const slotIdx = VIEW_CANDLES - view.length + vi;
+      const slotX = PAD + slotW * slotIdx + slotW / 2;
+      const y = scaleY(m.price);
+      const fill = m.kind === "entry" ? m.side === "long" ? "#5fa8a8" : "#c75c5c" : "#d4a84b";
+      const d = m.kind === "entry" ? m.side === "long" ? `M ${slotX - 4} ${y + 5} L ${slotX} ${y - 4} L ${slotX + 4} ${y + 5} Z` : `M ${slotX - 4} ${y - 5} L ${slotX} ${y + 4} L ${slotX + 4} ${y - 5} Z` : `M ${slotX} ${y - 3} L ${slotX + 3} ${y} L ${slotX} ${y + 3} L ${slotX - 3} ${y} Z`;
+      return /* @__PURE__ */ import_react3.default.createElement("path", { key: mi, d, fill, stroke: "#0a0b0d", strokeWidth: "0.35", opacity: "0.95" });
     }));
+  }
+  function StepEquityChart({ curve }) {
+    const W = 360, H = 88, PAD = 6;
+    if (!curve || curve.length < 2) {
+      return /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[10px] text-[var(--fg-mute)] font-mono" }, "Insufficient samples");
+    }
+    const eq = curve.map((p) => p.equity);
+    const minE = Math.min(...eq), maxE = Math.max(...eq);
+    const den = maxE - minE || 1;
+    const innerW = W - PAD * 2, innerH = H - PAD * 2;
+    const n = curve.length;
+    let d = "";
+    for (let i = 0; i < n; i++) {
+      const x = PAD + i / Math.max(1, n - 1) * innerW;
+      const y = PAD + (maxE - curve[i].equity) / den * innerH;
+      if (i === 0) d = `M ${x} ${y}`;
+      else d += ` H ${x} V ${y}`;
+    }
+    return /* @__PURE__ */ import_react3.default.createElement("svg", { viewBox: `0 0 ${W} ${H}`, className: "w-full max-w-[360px]", preserveAspectRatio: "none" }, /* @__PURE__ */ import_react3.default.createElement("rect", { width: W, height: H, fill: "#0a0b0d", stroke: "#1d2025" }), /* @__PURE__ */ import_react3.default.createElement("path", { d, fill: "none", stroke: "#d4a84b", strokeWidth: "1.2", vectorEffect: "non-scaling-stroke" }));
+  }
+  function BacktestModal({
+    open,
+    onClose,
+    onRun,
+    execution,
+    setExecution,
+    result,
+    recommendations,
+    strategyName,
+    setStrategyName
+  }) {
+    if (!open) return null;
+    return /* @__PURE__ */ import_react3.default.createElement("div", { className: "fixed inset-0 z-[600] flex items-center justify-center p-4", style: { background: "rgba(0,0,0,0.72)" } }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "bg-[var(--bg-alt)] border border-[var(--line-strong)] max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex items-center justify-between border-b border-[var(--line)] px-4 py-3" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[10px] tracking-[0.25em] uppercase text-[var(--fg-dim)]" }, "Backtest (simulated)"), /* @__PURE__ */ import_react3.default.createElement("button", { type: "button", onClick: onClose, className: "p-1 text-[var(--fg-mute)] hover:text-[var(--amber)]", "aria-label": "Close" }, /* @__PURE__ */ import_react3.default.createElement(X, { size: 16, strokeWidth: 1.5 }))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "p-4 space-y-4 text-[11px] font-mono" }, /* @__PURE__ */ import_react3.default.createElement(Tip, { block: true, text: "Uses recorded signal tape (smoothed EMA + trendMode) and next-bar-open fills. Early flat equity is normal while detectors warm up (~20\u201330+ bars)." }, /* @__PURE__ */ import_react3.default.createElement("p", { className: "text-[10px] text-[var(--fg-dim)] leading-relaxed" }, "Results mirror the causal tape \u2014 not a replay of future phase data. Warm-up segments show as flat steps until gates activate.")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "grid grid-cols-2 gap-3" }, /* @__PURE__ */ import_react3.default.createElement("label", { className: "block" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[9px] tracking-[0.2em] uppercase text-[var(--fg-mute)]" }, "Slippage (ticks, ", ES_TICK, " pt)"), /* @__PURE__ */ import_react3.default.createElement(
+      "input",
+      {
+        type: "number",
+        min: 0,
+        step: 1,
+        value: execution.slippageTicks,
+        onChange: (e) => setExecution((x) => ({ ...x, slippageTicks: +e.target.value || 0 })),
+        className: "mt-1 w-full bg-[#0a0b0d] border border-[var(--line)] px-2 py-1 text-[var(--fg)]"
+      }
+    )), /* @__PURE__ */ import_react3.default.createElement("label", { className: "block" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[9px] tracking-[0.2em] uppercase text-[var(--fg-mute)]" }, "Commission / side"), /* @__PURE__ */ import_react3.default.createElement(
+      "input",
+      {
+        type: "number",
+        min: 0,
+        step: 0.25,
+        value: execution.commissionPerSide,
+        onChange: (e) => setExecution((x) => ({ ...x, commissionPerSide: +e.target.value || 0 })),
+        className: "mt-1 w-full bg-[#0a0b0d] border border-[var(--line)] px-2 py-1 text-[var(--fg)]"
+      }
+    )), /* @__PURE__ */ import_react3.default.createElement("label", { className: "block" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[9px] tracking-[0.2em] uppercase text-[var(--fg-mute)]" }, "Initial balance"), /* @__PURE__ */ import_react3.default.createElement(
+      "input",
+      {
+        type: "number",
+        min: 100,
+        step: 100,
+        value: execution.initialBalance,
+        onChange: (e) => setExecution((x) => ({ ...x, initialBalance: +e.target.value || 1e4 })),
+        className: "mt-1 w-full bg-[#0a0b0d] border border-[var(--line)] px-2 py-1 text-[var(--fg)]"
+      }
+    )), /* @__PURE__ */ import_react3.default.createElement("label", { className: "flex items-end gap-2 pb-1" }, /* @__PURE__ */ import_react3.default.createElement(
+      "input",
+      {
+        type: "checkbox",
+        checked: execution.useSpreadFloor,
+        onChange: (e) => setExecution((x) => ({ ...x, useSpreadFloor: e.target.checked }))
+      }
+    ), /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[9px] text-[var(--fg-dim)]" }, "Spread floor (REQ-FEED-02)"))), /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[9px] tracking-[0.2em] uppercase text-[var(--fg-mute)]" }, "Strategy"), /* @__PURE__ */ import_react3.default.createElement(
+      "select",
+      {
+        value: strategyName,
+        onChange: (e) => setStrategyName(e.target.value),
+        className: "mt-1 w-full bg-[#0a0b0d] border border-[var(--line)] px-2 py-1 text-[var(--fg)]"
+      },
+      /* @__PURE__ */ import_react3.default.createElement("option", { value: "default" }, "Trend-follow (continuation gates)"),
+      /* @__PURE__ */ import_react3.default.createElement("option", { value: "meanReversion" }, "Mean reversion (high reversal \xB7 low trend)")
+    )), /* @__PURE__ */ import_react3.default.createElement(
+      "button",
+      {
+        type: "button",
+        onClick: onRun,
+        className: "w-full py-2 border border-[var(--amber)] text-[var(--amber)] text-[10px] tracking-[0.2em] uppercase hover:bg-[rgba(212,168,75,0.12)]"
+      },
+      "Run backtest"
+    ), result && /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement("div", { className: "border border-[var(--line)] p-3 space-y-2" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[9px] tracking-[0.22em] uppercase text-[var(--fg-mute)]" }, "Step equity"), /* @__PURE__ */ import_react3.default.createElement(StepEquityChart, { curve: result.equityCurve }), /* @__PURE__ */ import_react3.default.createElement("div", { className: "grid grid-cols-2 gap-2 text-[10px]" }, /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[var(--fg-mute)]" }, "Return "), result.metrics.totalReturnPct.toFixed(2), "%"), /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[var(--fg-mute)]" }, "Max DD "), result.metrics.maxDrawdownPct.toFixed(1), "%"), /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[var(--fg-mute)]" }, "Trades "), result.metrics.tradeCount), /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[var(--fg-mute)]" }, "Win rate "), (result.metrics.winRate * 100).toFixed(0), "%"), /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[var(--fg-mute)]" }, "PF "), result.metrics.profitFactor.toFixed(2)), /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[var(--fg-mute)]" }, "Balance "), result.metrics.finalBalance.toFixed(1)))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "border border-[var(--line)] p-3" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[9px] tracking-[0.22em] uppercase text-[var(--fg-mute)] mb-2" }, "Quadrant attribution (entry)"), /* @__PURE__ */ import_react3.default.createElement("table", { className: "w-full text-[10px]" }, /* @__PURE__ */ import_react3.default.createElement("thead", null, /* @__PURE__ */ import_react3.default.createElement("tr", { className: "text-[var(--fg-mute)] text-left" }, /* @__PURE__ */ import_react3.default.createElement("th", { className: "pb-1" }, "Q"), /* @__PURE__ */ import_react3.default.createElement("th", null, "Trades"), /* @__PURE__ */ import_react3.default.createElement("th", null, "Wins"), /* @__PURE__ */ import_react3.default.createElement("th", null, "Losses"), /* @__PURE__ */ import_react3.default.createElement("th", null, "Win %"))), /* @__PURE__ */ import_react3.default.createElement("tbody", null, [1, 2, 3, 4].map((q) => {
+      const row = result.quadrantStats[q];
+      const wr = row.count ? (row.wins / row.count * 100).toFixed(0) : "\u2014";
+      return /* @__PURE__ */ import_react3.default.createElement("tr", { key: q, className: "border-t border-[var(--line)]" }, /* @__PURE__ */ import_react3.default.createElement("td", { className: "py-1" }, "Q", q), /* @__PURE__ */ import_react3.default.createElement("td", null, row.count), /* @__PURE__ */ import_react3.default.createElement("td", { className: "text-[#6ba368]" }, row.wins), /* @__PURE__ */ import_react3.default.createElement("td", { className: "text-[#c75c5c]" }, row.losses), /* @__PURE__ */ import_react3.default.createElement("td", null, wr, row.count ? "%" : ""));
+    })))), recommendations?.length > 0 && /* @__PURE__ */ import_react3.default.createElement("div", { className: "border border-[var(--line)] p-3 space-y-2" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[9px] tracking-[0.22em] uppercase text-[var(--fg-mute)]" }, "Suggestions"), recommendations.map((r, i) => /* @__PURE__ */ import_react3.default.createElement("div", { key: i, className: "text-[10px] text-[var(--fg-dim)] leading-snug" }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[var(--amber)]" }, r.parameter, ":"), " ", r.reason)))))));
   }
   function DepthHeatmap({ book }) {
     if (!book) {
@@ -25215,6 +25652,23 @@
     const [vectorHistory, setVectorHistory] = (0, import_react3.useState)([]);
     const lastQuadRef = (0, import_react3.useRef)(null);
     const candleCountRef = (0, import_react3.useRef)(0);
+    const signalTapeRef = (0, import_react3.useRef)([]);
+    const prevCandleLenRef = (0, import_react3.useRef)(0);
+    const prevFirstCandleIdRef = (0, import_react3.useRef)(null);
+    const [backtestOpen, setBacktestOpen] = (0, import_react3.useState)(false);
+    const [execution, setExecution] = (0, import_react3.useState)({
+      slippageTicks: 2,
+      commissionPerSide: 0,
+      riskFractionPerTrade: 0.01,
+      fillLatencyBars: 1,
+      initialBalance: 1e4,
+      useSpreadFloor: true,
+      warmupBars: 5
+    });
+    const [backtestResult, setBacktestResult] = (0, import_react3.useState)(null);
+    const [backtestRecommendations, setBacktestRecommendations] = (0, import_react3.useState)([]);
+    const [strategyName, setStrategyName] = (0, import_react3.useState)("default");
+    const [tradeMarkers, setTradeMarkers] = (0, import_react3.useState)([]);
     const [vw, setVw] = (0, import_react3.useState)(() => typeof window !== "undefined" ? window.innerWidth : 1280);
     (0, import_react3.useEffect)(() => {
       const onResize = () => setVw(window.innerWidth);
@@ -25800,6 +26254,67 @@
       smoothedTrendRef.current = next;
       return { ...trendStrength, score: next, rawSignificant: trendStrength.score };
     }, [trendStrength, regimeFilter]);
+    (0, import_react3.useEffect)(() => {
+      if (candles.length === 0) {
+        smoothedScoreRef.current = 0;
+        smoothedTrendRef.current = 0;
+      }
+    }, [candles.length]);
+    (0, import_react3.useEffect)(() => {
+      if (candles.length === 0) {
+        signalTapeRef.current = [];
+        prevCandleLenRef.current = 0;
+        prevFirstCandleIdRef.current = null;
+        return;
+      }
+      const prevLen = prevCandleLenRef.current;
+      const curFirstId = candles[0]?.id;
+      const rolled = prevLen === candles.length && prevFirstCandleIdRef.current != null && curFirstId !== prevFirstCandleIdRef.current;
+      const snap = {
+        trendTier: smoothedTrendStrength.tier,
+        trendDirection: smoothedTrendStrength.direction,
+        trendScore: smoothedTrendStrength.score,
+        trendMode: current?.trendMode,
+        reversalScore: smoothedReversal.score,
+        reversalTier: reversalTierFromScore(smoothedReversal.score),
+        reversalTarget: smoothedReversal.target ? { x: smoothedReversal.target.x, y: smoothedReversal.target.y } : null,
+        reversalDirection: smoothedReversal.direction,
+        quad: current?.quad,
+        smoothQuad: current?.smoothQuad,
+        isFiltered: regimeFilter,
+        effectiveCoord,
+        coord: current?.coord,
+        smoothCoord: current?.smoothCoord
+      };
+      if (candles.length > prevLen) {
+        signalTapeRef.current.push(snap);
+      } else if (candles.length < prevLen) {
+        signalTapeRef.current = [];
+      } else if (rolled) {
+        signalTapeRef.current.shift();
+        signalTapeRef.current.push(snap);
+      } else if (signalTapeRef.current.length === candles.length) {
+        signalTapeRef.current[signalTapeRef.current.length - 1] = snap;
+      } else if (signalTapeRef.current.length < candles.length) {
+        signalTapeRef.current.push(snap);
+      }
+      prevCandleLenRef.current = candles.length;
+      prevFirstCandleIdRef.current = curFirstId;
+    }, [candles, current, smoothedReversal, smoothedTrendStrength, regimeFilter, effectiveCoord]);
+    const runBacktestHandler = (0, import_react3.useCallback)(() => {
+      const signals = signalTapeRef.current;
+      if (!signals.length || signals.length !== candles.length) return;
+      const strat = buildStrategy(strategyName);
+      const res = runBacktest({
+        bars: candles,
+        signals,
+        execution,
+        strategy: strat
+      });
+      setBacktestResult(res);
+      setTradeMarkers(res.markers || []);
+      setBacktestRecommendations(buildRecommendations(res.metrics, execution, res.trades));
+    }, [candles, execution, strategyName]);
     const mtfConfluenceActive = !!(htfContext && smoothedReversal.signals?.some((s) => s.law === "TF Confluence"));
     (0, import_react3.useEffect)(() => {
       if (!current) return;
@@ -25922,6 +26437,11 @@
             setVectorHistory([]);
             lastQuadRef.current = null;
             candleCountRef.current = 0;
+            signalTapeRef.current = [];
+            prevCandleLenRef.current = 0;
+            prevFirstCandleIdRef.current = null;
+            setTradeMarkers([]);
+            setBacktestResult(null);
           },
           className: "flex items-center gap-2 px-3 py-1.5 border border-[var(--line-strong)] text-[var(--fg)] hover:border-[var(--amber)] hover:text-[var(--amber)] transition-colors text-[11px] tracking-[0.1em] uppercase bg-transparent"
         },
@@ -26066,7 +26586,16 @@
         borderColor: "#d4a84b",
         color: "#d4a84b",
         background: "rgba(212,168,75,0.08)"
-      } }, "HA"))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex items-center gap-3 text-[9px] tracking-[0.15em] uppercase text-[var(--fg-mute)]" }, /* @__PURE__ */ import_react3.default.createElement("span", null, "width = vol"), /* @__PURE__ */ import_react3.default.createElement("span", null, "height = body"))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex gap-2", style: { height: isMobile ? 240 : 300 } }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex-1 border border-[var(--line)] min-w-0" }, /* @__PURE__ */ import_react3.default.createElement(CandleChart, { candles, smooth: regimeFilter })), /* @__PURE__ */ import_react3.default.createElement(DepthHeatmap, { book: current?.book }))), /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(220px, 1fr)", gap: "12px", alignItems: "start" } }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "bg-[var(--bg-alt)] border border-[var(--line)] p-5 relative" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex items-center justify-between mb-4 flex-wrap gap-2" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ import_react3.default.createElement(Layers, { size: 12, className: "text-[var(--amber)]", strokeWidth: 1.5 }), /* @__PURE__ */ import_react3.default.createElement(Tip, { text: "10\xD710 effort (volume axis) vs result (body axis) grid. Highlighted cell is the live coordinate; dashed trail shows prior path." }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[9px] tracking-[0.25em] uppercase text-[var(--fg-dim)]" }, "10\xD710 Coordinate Matrix")), regimeFilter && /* @__PURE__ */ import_react3.default.createElement(Tip, { text: "Kinetic regime path: matrix trail and most reversal laws use smoothed coordinates and trend-persistent bias while the filter is on." }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[8px] tracking-[0.2em] uppercase font-medium ml-1 px-1.5 py-0.5 border", style: {
+      } }, "HA"))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex items-center gap-3 text-[9px] tracking-[0.15em] uppercase text-[var(--fg-mute)]" }, /* @__PURE__ */ import_react3.default.createElement(Tip, { text: "Simulated backtest: uses recorded causal tape (smoothed gauges + trendMode), next-bar-open fills; no access to scripted phase lookahead." }, /* @__PURE__ */ import_react3.default.createElement(
+        "button",
+        {
+          type: "button",
+          onClick: () => setBacktestOpen(true),
+          className: "p-1 text-[var(--fg-mute)] hover:text-[var(--amber)] border border-transparent hover:border-[var(--line)] rounded-sm transition-colors",
+          "aria-label": "Backtest"
+        },
+        /* @__PURE__ */ import_react3.default.createElement(FlaskConical, { size: 14, strokeWidth: 1.5 })
+      )), /* @__PURE__ */ import_react3.default.createElement("span", null, "width = vol"), /* @__PURE__ */ import_react3.default.createElement("span", null, "height = body"))), /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex gap-2", style: { height: isMobile ? 240 : 300 } }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex-1 border border-[var(--line)] min-w-0" }, /* @__PURE__ */ import_react3.default.createElement(CandleChart, { candles, smooth: regimeFilter, tradeMarkers })), /* @__PURE__ */ import_react3.default.createElement(DepthHeatmap, { book: current?.book }))), /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(220px, 1fr)", gap: "12px", alignItems: "start" } }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "bg-[var(--bg-alt)] border border-[var(--line)] p-5 relative" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex items-center justify-between mb-4 flex-wrap gap-2" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ import_react3.default.createElement(Layers, { size: 12, className: "text-[var(--amber)]", strokeWidth: 1.5 }), /* @__PURE__ */ import_react3.default.createElement(Tip, { text: "10\xD710 effort (volume axis) vs result (body axis) grid. Highlighted cell is the live coordinate; dashed trail shows prior path." }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[9px] tracking-[0.25em] uppercase text-[var(--fg-dim)]" }, "10\xD710 Coordinate Matrix")), regimeFilter && /* @__PURE__ */ import_react3.default.createElement(Tip, { text: "Kinetic regime path: matrix trail and most reversal laws use smoothed coordinates and trend-persistent bias while the filter is on." }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[8px] tracking-[0.2em] uppercase font-medium ml-1 px-1.5 py-0.5 border", style: {
         borderColor: "#d4a84b",
         color: "#d4a84b",
         background: "rgba(212,168,75,0.08)"
@@ -26128,7 +26657,20 @@
           regimeFilter,
           mtfConfluenceActive
         }
-      )))), /* @__PURE__ */ import_react3.default.createElement("aside", { className: "space-y-4", style: { order: isDesktop ? 0 : 3 } }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "bg-[var(--bg-alt)] border border-[var(--line)] p-5" }, /* @__PURE__ */ import_react3.default.createElement(PhaseTimeline, { phaseIdx, phaseTick, phase })), /* @__PURE__ */ import_react3.default.createElement("div", { className: "bg-[var(--bg-alt)] border border-[var(--line)] p-5" }, /* @__PURE__ */ import_react3.default.createElement(VectorTicker, { vectorHistory })), /* @__PURE__ */ import_react3.default.createElement(TrendStrengthPanel, { trend: smoothedTrendStrength, profile, regimeFilter }), /* @__PURE__ */ import_react3.default.createElement(Tip, { text: "Joint readout maps continuation strength tier \xD7 reversal tier to a narrative phrase (presentation only; no additional scoring).", block: true }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "bg-[var(--bg-alt)] border border-[var(--line)] px-4 py-2.5" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[8px] tracking-[0.22em] uppercase text-[var(--fg-mute)] mb-1" }, "Joint readout \xB7 continuation \xD7 reversal"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[11px] text-[var(--fg-dim)] font-['Fraunces'] italic leading-snug" }, jointTrendReversalReadout(smoothedTrendStrength.tier, reversalTierFromScore(smoothedReversal.score))))))), /* @__PURE__ */ import_react3.default.createElement("footer", { className: "mt-8 pt-4 border-t border-[var(--line)] text-[9px] tracking-[0.22em] uppercase text-[var(--fg-mute)] flex justify-between px-5" }, /* @__PURE__ */ import_react3.default.createElement("span", null, "Percentile Rank \xB7 N=", profile.lookback, " \xB7", " ", "Spread Penalty ", (profile.spreadPenalty * 100).toFixed(1), "% \xB7", " ", "Significance \xD7", profile.significanceMultiplier.toFixed(2)), /* @__PURE__ */ import_react3.default.createElement("span", null, "Simulated feed \u2014 not market data")))
+      )))), /* @__PURE__ */ import_react3.default.createElement("aside", { className: "space-y-4", style: { order: isDesktop ? 0 : 3 } }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "bg-[var(--bg-alt)] border border-[var(--line)] p-5" }, /* @__PURE__ */ import_react3.default.createElement(PhaseTimeline, { phaseIdx, phaseTick, phase })), /* @__PURE__ */ import_react3.default.createElement("div", { className: "bg-[var(--bg-alt)] border border-[var(--line)] p-5" }, /* @__PURE__ */ import_react3.default.createElement(VectorTicker, { vectorHistory })), /* @__PURE__ */ import_react3.default.createElement(TrendStrengthPanel, { trend: smoothedTrendStrength, profile, regimeFilter }), /* @__PURE__ */ import_react3.default.createElement(Tip, { text: "Joint readout maps continuation strength tier \xD7 reversal tier to a narrative phrase (presentation only; no additional scoring).", block: true }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "bg-[var(--bg-alt)] border border-[var(--line)] px-4 py-2.5" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[8px] tracking-[0.22em] uppercase text-[var(--fg-mute)] mb-1" }, "Joint readout \xB7 continuation \xD7 reversal"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[11px] text-[var(--fg-dim)] font-['Fraunces'] italic leading-snug" }, jointTrendReversalReadout(smoothedTrendStrength.tier, reversalTierFromScore(smoothedReversal.score))))))), /* @__PURE__ */ import_react3.default.createElement("footer", { className: "mt-8 pt-4 border-t border-[var(--line)] text-[9px] tracking-[0.22em] uppercase text-[var(--fg-mute)] flex justify-between px-5" }, /* @__PURE__ */ import_react3.default.createElement("span", null, "Percentile Rank \xB7 N=", profile.lookback, " \xB7", " ", "Spread Penalty ", (profile.spreadPenalty * 100).toFixed(1), "% \xB7", " ", "Significance \xD7", profile.significanceMultiplier.toFixed(2)), /* @__PURE__ */ import_react3.default.createElement("span", null, "Simulated feed \u2014 not market data")), /* @__PURE__ */ import_react3.default.createElement(
+        BacktestModal,
+        {
+          open: backtestOpen,
+          onClose: () => setBacktestOpen(false),
+          onRun: runBacktestHandler,
+          execution,
+          setExecution,
+          result: backtestResult,
+          recommendations: backtestRecommendations,
+          strategyName,
+          setStrategyName
+        }
+      ))
     );
   }
   function StatRow({ label, value, subvalue, suffix, accent, accentColor, title: tipTitle }) {
@@ -26255,6 +26797,14 @@ lucide-react/dist/esm/icons/clock.js:
    * See the LICENSE file in the root directory of this source tree.
    *)
 
+lucide-react/dist/esm/icons/flask-conical.js:
+  (**
+   * @license lucide-react v0.468.0 - ISC
+   *
+   * This source code is licensed under the ISC license.
+   * See the LICENSE file in the root directory of this source tree.
+   *)
+
 lucide-react/dist/esm/icons/gauge.js:
   (**
    * @license lucide-react v0.468.0 - ISC
@@ -26336,6 +26886,14 @@ lucide-react/dist/esm/icons/trending-up.js:
    *)
 
 lucide-react/dist/esm/icons/waves.js:
+  (**
+   * @license lucide-react v0.468.0 - ISC
+   *
+   * This source code is licensed under the ISC license.
+   * See the LICENSE file in the root directory of this source tree.
+   *)
+
+lucide-react/dist/esm/icons/x.js:
   (**
    * @license lucide-react v0.468.0 - ISC
    *

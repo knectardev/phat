@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Play, Pause, Rewind, Gauge, Activity, Zap, Target, TrendingUp, TrendingDown, Minus, CircleDot, Radio, Layers, Waves, Clock } from 'lucide-react';
+import { Play, Pause, Rewind, Gauge, Activity, Zap, Target, TrendingUp, TrendingDown, Minus, CircleDot, Radio, Layers, Waves, Clock, FlaskConical, X } from 'lucide-react';
+import { runBacktest, ES_TICK as ENGINE_ES_TICK } from './lib/backtestEngine.js';
+import { defaultStrategy, buildStrategy } from './lib/strategyPresets.js';
+import { buildRecommendations } from './lib/backtestRecommendations.js';
 
 // ═══════════════════════════════════════════════════════════════
 //  VWC DYNAMIC MATRIX — Real-Time Geometric Pattern Recognizer
@@ -753,7 +756,7 @@ function useScriptedFeed(playing, speed, timeframe) {
 // ═══════════════════════════════════════════════════════════════
 
 // ─── Candle Chart (scrolling) ───
-function CandleChart({ candles, smooth }) {
+function CandleChart({ candles, smooth, tradeMarkers = [] }) {
   const view = candles.slice(-VIEW_CANDLES);
   if (view.length === 0) return (
     <div className="h-full flex items-center justify-center text-[var(--fg-mute)] text-xs tracking-[0.3em] uppercase">
@@ -786,6 +789,7 @@ function CandleChart({ candles, smooth }) {
   const maxVol = Math.max(...view.map(c => c.vol));
   // Each slot gets a fixed width; candle body width = function of volume
   const slotW = plotW / VIEW_CANDLES;
+  const viewStart = candles.length - view.length;
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
@@ -845,7 +849,172 @@ function CandleChart({ candles, smooth }) {
           </g>
         );
       })}
+
+      {tradeMarkers.map((m, mi) => {
+        if (m.barIndex < viewStart || m.barIndex >= candles.length) return null;
+        const vi = m.barIndex - viewStart;
+        const slotIdx = VIEW_CANDLES - view.length + vi;
+        const slotX = PAD + slotW * slotIdx + slotW / 2;
+        const y = scaleY(m.price);
+        const fill = m.kind === 'entry'
+          ? (m.side === 'long' ? '#5fa8a8' : '#c75c5c')
+          : '#d4a84b';
+        const d = m.kind === 'entry'
+          ? (m.side === 'long'
+            ? `M ${slotX - 4} ${y + 5} L ${slotX} ${y - 4} L ${slotX + 4} ${y + 5} Z`
+            : `M ${slotX - 4} ${y - 5} L ${slotX} ${y + 4} L ${slotX + 4} ${y - 5} Z`)
+          : `M ${slotX} ${y - 3} L ${slotX + 3} ${y} L ${slotX} ${y + 3} L ${slotX - 3} ${y} Z`;
+        return <path key={mi} d={d} fill={fill} stroke="#0a0b0d" strokeWidth="0.35" opacity="0.95"/>;
+      })}
     </svg>
+  );
+}
+
+function StepEquityChart({ curve }) {
+  const W = 360, H = 88, PAD = 6;
+  if (!curve || curve.length < 2) {
+    return <div className="text-[10px] text-[var(--fg-mute)] font-mono">Insufficient samples</div>;
+  }
+  const eq = curve.map(p => p.equity);
+  const minE = Math.min(...eq), maxE = Math.max(...eq);
+  const den = maxE - minE || 1;
+  const innerW = W - PAD * 2, innerH = H - PAD * 2;
+  const n = curve.length;
+  let d = '';
+  for (let i = 0; i < n; i++) {
+    const x = PAD + (i / Math.max(1, n - 1)) * innerW;
+    const y = PAD + (maxE - curve[i].equity) / den * innerH;
+    if (i === 0) d = `M ${x} ${y}`;
+    else d += ` H ${x} V ${y}`;
+  }
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[360px]" preserveAspectRatio="none">
+      <rect width={W} height={H} fill="#0a0b0d" stroke="#1d2025"/>
+      <path d={d} fill="none" stroke="#d4a84b" strokeWidth="1.2" vectorEffect="non-scaling-stroke"/>
+    </svg>
+  );
+}
+
+function BacktestModal({
+  open, onClose, onRun, execution, setExecution, result, recommendations, strategyName, setStrategyName,
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[600] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.72)' }}>
+      <div className="bg-[var(--bg-alt)] border border-[var(--line-strong)] max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
+          <div className="text-[10px] tracking-[0.25em] uppercase text-[var(--fg-dim)]">Backtest (simulated)</div>
+          <button type="button" onClick={onClose} className="p-1 text-[var(--fg-mute)] hover:text-[var(--amber)]" aria-label="Close">
+            <X size={16} strokeWidth={1.5}/>
+          </button>
+        </div>
+        <div className="p-4 space-y-4 text-[11px] font-mono">
+          <Tip block text="Uses recorded signal tape (smoothed EMA + trendMode) and next-bar-open fills. Early flat equity is normal while detectors warm up (~20–30+ bars).">
+            <p className="text-[10px] text-[var(--fg-dim)] leading-relaxed">
+              Results mirror the causal tape — not a replay of future phase data. Warm-up segments show as flat steps until gates activate.
+            </p>
+          </Tip>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-[9px] tracking-[0.2em] uppercase text-[var(--fg-mute)]">Slippage (ticks, {ENGINE_ES_TICK} pt)</span>
+              <input type="number" min={0} step={1} value={execution.slippageTicks}
+                onChange={e => setExecution(x => ({ ...x, slippageTicks: +e.target.value || 0 }))}
+                className="mt-1 w-full bg-[#0a0b0d] border border-[var(--line)] px-2 py-1 text-[var(--fg)]"/>
+            </label>
+            <label className="block">
+              <span className="text-[9px] tracking-[0.2em] uppercase text-[var(--fg-mute)]">Commission / side</span>
+              <input type="number" min={0} step={0.25} value={execution.commissionPerSide}
+                onChange={e => setExecution(x => ({ ...x, commissionPerSide: +e.target.value || 0 }))}
+                className="mt-1 w-full bg-[#0a0b0d] border border-[var(--line)] px-2 py-1 text-[var(--fg)]"/>
+            </label>
+            <label className="block">
+              <span className="text-[9px] tracking-[0.2em] uppercase text-[var(--fg-mute)]">Initial balance</span>
+              <input type="number" min={100} step={100} value={execution.initialBalance}
+                onChange={e => setExecution(x => ({ ...x, initialBalance: +e.target.value || 10000 }))}
+                className="mt-1 w-full bg-[#0a0b0d] border border-[var(--line)] px-2 py-1 text-[var(--fg)]"/>
+            </label>
+            <label className="flex items-end gap-2 pb-1">
+              <input type="checkbox" checked={execution.useSpreadFloor}
+                onChange={e => setExecution(x => ({ ...x, useSpreadFloor: e.target.checked }))}/>
+              <span className="text-[9px] text-[var(--fg-dim)]">Spread floor (REQ-FEED-02)</span>
+            </label>
+          </div>
+
+          <div>
+            <span className="text-[9px] tracking-[0.2em] uppercase text-[var(--fg-mute)]">Strategy</span>
+            <select value={strategyName} onChange={e => setStrategyName(e.target.value)}
+              className="mt-1 w-full bg-[#0a0b0d] border border-[var(--line)] px-2 py-1 text-[var(--fg)]">
+              <option value="default">Trend-follow (continuation gates)</option>
+              <option value="meanReversion">Mean reversion (high reversal · low trend)</option>
+            </select>
+          </div>
+
+          <button type="button" onClick={onRun}
+            className="w-full py-2 border border-[var(--amber)] text-[var(--amber)] text-[10px] tracking-[0.2em] uppercase hover:bg-[rgba(212,168,75,0.12)]">
+            Run backtest
+          </button>
+
+          {result && (
+            <>
+              <div className="border border-[var(--line)] p-3 space-y-2">
+                <div className="text-[9px] tracking-[0.22em] uppercase text-[var(--fg-mute)]">Step equity</div>
+                <StepEquityChart curve={result.equityCurve}/>
+                <div className="grid grid-cols-2 gap-2 text-[10px]">
+                  <div><span className="text-[var(--fg-mute)]">Return </span>{result.metrics.totalReturnPct.toFixed(2)}%</div>
+                  <div><span className="text-[var(--fg-mute)]">Max DD </span>{result.metrics.maxDrawdownPct.toFixed(1)}%</div>
+                  <div><span className="text-[var(--fg-mute)]">Trades </span>{result.metrics.tradeCount}</div>
+                  <div><span className="text-[var(--fg-mute)]">Win rate </span>{(result.metrics.winRate * 100).toFixed(0)}%</div>
+                  <div><span className="text-[var(--fg-mute)]">PF </span>{result.metrics.profitFactor.toFixed(2)}</div>
+                  <div><span className="text-[var(--fg-mute)]">Balance </span>{result.metrics.finalBalance.toFixed(1)}</div>
+                </div>
+              </div>
+
+              <div className="border border-[var(--line)] p-3">
+                <div className="text-[9px] tracking-[0.22em] uppercase text-[var(--fg-mute)] mb-2">Quadrant attribution (entry)</div>
+                <table className="w-full text-[10px]">
+                  <thead>
+                    <tr className="text-[var(--fg-mute)] text-left">
+                      <th className="pb-1">Q</th>
+                      <th>Trades</th>
+                      <th>Wins</th>
+                      <th>Losses</th>
+                      <th>Win %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[1, 2, 3, 4].map(q => {
+                      const row = result.quadrantStats[q];
+                      const wr = row.count ? (row.wins / row.count * 100).toFixed(0) : '—';
+                      return (
+                        <tr key={q} className="border-t border-[var(--line)]">
+                          <td className="py-1">Q{q}</td>
+                          <td>{row.count}</td>
+                          <td className="text-[#6ba368]">{row.wins}</td>
+                          <td className="text-[#c75c5c]">{row.losses}</td>
+                          <td>{wr}{row.count ? '%' : ''}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {recommendations?.length > 0 && (
+                <div className="border border-[var(--line)] p-3 space-y-2">
+                  <div className="text-[9px] tracking-[0.22em] uppercase text-[var(--fg-mute)]">Suggestions</div>
+                  {recommendations.map((r, i) => (
+                    <div key={i} className="text-[10px] text-[var(--fg-dim)] leading-snug">
+                      <span className="text-[var(--amber)]">{r.parameter}:</span> {r.reason}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1827,6 +1996,24 @@ export default function App() {
   const [vectorHistory, setVectorHistory] = useState([]);
   const lastQuadRef = useRef(null);
   const candleCountRef = useRef(0);
+  const signalTapeRef = useRef([]);
+  const prevCandleLenRef = useRef(0);
+  const prevFirstCandleIdRef = useRef(null);
+
+  const [backtestOpen, setBacktestOpen] = useState(false);
+  const [execution, setExecution] = useState({
+    slippageTicks: 2,
+    commissionPerSide: 0,
+    riskFractionPerTrade: 0.01,
+    fillLatencyBars: 1,
+    initialBalance: 10000,
+    useSpreadFloor: true,
+    warmupBars: 5,
+  });
+  const [backtestResult, setBacktestResult] = useState(null);
+  const [backtestRecommendations, setBacktestRecommendations] = useState([]);
+  const [strategyName, setStrategyName] = useState('default');
+  const [tradeMarkers, setTradeMarkers] = useState([]);
 
   // ── Viewport tracking for JS-driven responsive layout ──
   // Tailwind arbitrary-value responsive classes (xl:grid-cols-[1fr_320px]) aren't
@@ -2584,6 +2771,78 @@ export default function App() {
     return { ...trendStrength, score: next, rawSignificant: trendStrength.score };
   }, [trendStrength, regimeFilter]);
 
+  useEffect(() => {
+    if (candles.length === 0) {
+      smoothedScoreRef.current = 0;
+      smoothedTrendRef.current = 0;
+    }
+  }, [candles.length]);
+
+  useEffect(() => {
+    if (candles.length === 0) {
+      signalTapeRef.current = [];
+      prevCandleLenRef.current = 0;
+      prevFirstCandleIdRef.current = null;
+      return;
+    }
+    const prevLen = prevCandleLenRef.current;
+    const curFirstId = candles[0]?.id;
+    const rolled =
+      prevLen === candles.length &&
+      prevFirstCandleIdRef.current != null &&
+      curFirstId !== prevFirstCandleIdRef.current;
+
+    const snap = {
+      trendTier: smoothedTrendStrength.tier,
+      trendDirection: smoothedTrendStrength.direction,
+      trendScore: smoothedTrendStrength.score,
+      trendMode: current?.trendMode,
+      reversalScore: smoothedReversal.score,
+      reversalTier: reversalTierFromScore(smoothedReversal.score),
+      reversalTarget: smoothedReversal.target
+        ? { x: smoothedReversal.target.x, y: smoothedReversal.target.y }
+        : null,
+      reversalDirection: smoothedReversal.direction,
+      quad: current?.quad,
+      smoothQuad: current?.smoothQuad,
+      isFiltered: regimeFilter,
+      effectiveCoord,
+      coord: current?.coord,
+      smoothCoord: current?.smoothCoord,
+    };
+
+    if (candles.length > prevLen) {
+      signalTapeRef.current.push(snap);
+    } else if (candles.length < prevLen) {
+      signalTapeRef.current = [];
+    } else if (rolled) {
+      signalTapeRef.current.shift();
+      signalTapeRef.current.push(snap);
+    } else if (signalTapeRef.current.length === candles.length) {
+      signalTapeRef.current[signalTapeRef.current.length - 1] = snap;
+    } else if (signalTapeRef.current.length < candles.length) {
+      signalTapeRef.current.push(snap);
+    }
+
+    prevCandleLenRef.current = candles.length;
+    prevFirstCandleIdRef.current = curFirstId;
+  }, [candles, current, smoothedReversal, smoothedTrendStrength, regimeFilter, effectiveCoord]);
+
+  const runBacktestHandler = useCallback(() => {
+    const signals = signalTapeRef.current;
+    if (!signals.length || signals.length !== candles.length) return;
+    const strat = buildStrategy(strategyName);
+    const res = runBacktest({
+      bars: candles,
+      signals,
+      execution,
+      strategy: strat,
+    });
+    setBacktestResult(res);
+    setTradeMarkers(res.markers || []);
+    setBacktestRecommendations(buildRecommendations(res.metrics, execution, res.trades));
+  }, [candles, execution, strategyName]);
+
   const mtfConfluenceActive = !!(htfContext && smoothedReversal.signals?.some(s => s.law === 'TF Confluence'));
 
   // Detect named vector transitions
@@ -2741,7 +3000,17 @@ export default function App() {
           </Tip>
           <Tip text="Restart the scripted cycle from the beginning and clear named vector history.">
             <button
-              onClick={() => { reset(); setVectorHistory([]); lastQuadRef.current = null; candleCountRef.current = 0; }}
+              onClick={() => {
+                reset();
+                setVectorHistory([]);
+                lastQuadRef.current = null;
+                candleCountRef.current = 0;
+                signalTapeRef.current = [];
+                prevCandleLenRef.current = 0;
+                prevFirstCandleIdRef.current = null;
+                setTradeMarkers([]);
+                setBacktestResult(null);
+              }}
               className="flex items-center gap-2 px-3 py-1.5 border border-[var(--line-strong)] text-[var(--fg)] hover:border-[var(--amber)] hover:text-[var(--amber)] transition-colors text-[11px] tracking-[0.1em] uppercase bg-transparent"
             >
               <Rewind size={12} strokeWidth={1.75}/>
@@ -2995,13 +3264,23 @@ export default function App() {
                   )}
                 </div>
                 <div className="flex items-center gap-3 text-[9px] tracking-[0.15em] uppercase text-[var(--fg-mute)]">
+                  <Tip text="Simulated backtest: uses recorded causal tape (smoothed gauges + trendMode), next-bar-open fills; no access to scripted phase lookahead.">
+                    <button
+                      type="button"
+                      onClick={() => setBacktestOpen(true)}
+                      className="p-1 text-[var(--fg-mute)] hover:text-[var(--amber)] border border-transparent hover:border-[var(--line)] rounded-sm transition-colors"
+                      aria-label="Backtest"
+                    >
+                      <FlaskConical size={14} strokeWidth={1.5}/>
+                    </button>
+                  </Tip>
                   <span>width = vol</span>
                   <span>height = body</span>
                 </div>
               </div>
               <div className="flex gap-2" style={{ height: isMobile ? 240 : 300 }}>
                 <div className="flex-1 border border-[var(--line)] min-w-0">
-                  <CandleChart candles={candles} smooth={regimeFilter}/>
+                  <CandleChart candles={candles} smooth={regimeFilter} tradeMarkers={tradeMarkers}/>
                 </div>
                 <DepthHeatmap book={current?.book}/>
               </div>
@@ -3233,6 +3512,18 @@ export default function App() {
           </span>
           <span>Simulated feed — not market data</span>
         </footer>
+
+        <BacktestModal
+          open={backtestOpen}
+          onClose={() => setBacktestOpen(false)}
+          onRun={runBacktestHandler}
+          execution={execution}
+          setExecution={setExecution}
+          result={backtestResult}
+          recommendations={backtestRecommendations}
+          strategyName={strategyName}
+          setStrategyName={setStrategyName}
+        />
       </div>
     </div>
   );
