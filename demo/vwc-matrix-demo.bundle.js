@@ -24203,17 +24203,117 @@
     const spread = TICK;
     return { bids, asks, obi, bidTot, askTot, spread, mid: midPrice };
   }
+  var ES_TICK = 0.25;
+  function roundToTick(p, tick = ES_TICK) {
+    return Math.round(p / tick) * tick;
+  }
+  function randn() {
+    let u = 0;
+    let v = 0;
+    while (u === 0) u = Math.random();
+    while (v === 0) v = Math.random();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  }
+  function synthesizeIndexBar(prevClose, phase, timeframe, tfBodyScale, volClass, bodyClass, state) {
+    const rand = (a, b) => a + Math.random() * (b - a);
+    const gapProb = {
+      "1m": 0.07,
+      "5m": 0.09,
+      "15m": 0.11,
+      "1h": 0.14,
+      "1d": 0.24
+    }[timeframe] ?? 0.1;
+    const gapBoost = phase.id === "ignition" || phase.id === "breakdown" ? 0.1 : 0;
+    const gapTickSigma = {
+      "1m": 2.2,
+      "5m": 3,
+      "15m": 4,
+      "1h": 6,
+      "1d": 14
+    }[timeframe] ?? 3.5;
+    let open = prevClose;
+    if (Math.random() < gapProb + gapBoost) {
+      const ticks = Math.round(randn() * gapTickSigma + rand(-1.2, 1.2));
+      const clamped = Math.max(-32, Math.min(32, ticks));
+      open = roundToTick(prevClose + clamped * ES_TICK);
+    } else {
+      open = roundToTick(prevClose + rand(-0.5, 0.5) * ES_TICK);
+    }
+    const prevTR = Math.max(ES_TICK, state.lastTrueRange);
+    const normScale = tfBodyScale * 9 + 0.35;
+    const rangeVolSignal = Math.sqrt(Math.min(6, prevTR / normScale));
+    let vf = state.volFactor * (0.84 + 0.11 * rangeVolSignal + randn() * 0.04);
+    state.volFactor = Math.max(0.32, Math.min(3.4, vf));
+    let absBody = (Math.pow(bodyClass / 10, 1.2) * 12 + 0.2) * tfBodyScale * state.volFactor;
+    const tail = Math.random();
+    if (tail < 0.028) absBody *= 2.4 + Math.random() * 2.8;
+    else if (tail < 0.09) absBody *= 1.3 + Math.random() * 0.95;
+    const bias = phase.directionProb - 0.5;
+    state.momentum = Math.max(-1, Math.min(
+      1,
+      state.momentum * 0.8 + bias * 0.16 + randn() * 0.09 + (Math.random() - 0.5) * 0.07
+    ));
+    const st = state.streak;
+    const streakFade = (st === 0 ? 0 : Math.sign(st)) * Math.min(0.24, Math.abs(st) * 0.045);
+    let pUp = 0.5 + bias * 0.92 + state.momentum * 0.4 - streakFade;
+    pUp = Math.max(0.05, Math.min(0.95, pUp));
+    const up = Math.random() < pUp;
+    const sign = up ? 1 : -1;
+    const isDoji = Math.random() < 0.075 && phase.id !== "ignition" && phase.id !== "bullrun" && phase.id !== "breakdown";
+    const effectiveBody = isDoji ? sign * absBody * 0.11 : sign * absBody;
+    let close = roundToTick(open + effectiveBody);
+    const br = Math.abs(close - open) + ES_TICK * 0.25;
+    const wickRoll = Math.random();
+    let wu;
+    let wd;
+    if (wickRoll < 0.36) {
+      wu = br * (0.1 + Math.random() * 0.9);
+      wd = br * (0.1 + Math.random() * 0.9);
+    } else if (wickRoll < 0.62) {
+      wu = br * (0.42 + Math.random() * 1.55);
+      wd = br * (0.05 + Math.random() * 0.42);
+    } else {
+      wu = br * (0.05 + Math.random() * 0.42);
+      wd = br * (0.42 + Math.random() * 1.55);
+    }
+    let high = roundToTick(Math.max(open, close) + wu);
+    let low = roundToTick(Math.min(open, close) - wd);
+    if (high <= Math.max(open, close)) high = roundToTick(Math.max(open, close) + ES_TICK);
+    if (low >= Math.min(open, close)) low = roundToTick(Math.min(open, close) - ES_TICK);
+    const trueRange = high - low;
+    state.lastTrueRange = trueRange;
+    if (close > open) state.streak = st >= 0 ? st + 1 : 1;
+    else if (close < open) state.streak = st <= 0 ? st - 1 : -1;
+    else state.streak = 0;
+    const baseVol = Math.pow(volClass / 10, 1.5) * 1e4;
+    const rangeNorm = trueRange / (tfBodyScale * 10 + 0.25);
+    const activity = 0.52 + 0.9 * Math.tanh(rangeNorm * 1.05) + state.volFactor * 0.12;
+    const absVol = Math.max(400, baseVol * activity + Math.exp(randn() * 0.11) * 220);
+    return { open, high, low, close, vol: absVol, trueRange };
+  }
   function useScriptedFeed(playing, speed, timeframe) {
     const [candles, setCandles] = (0, import_react3.useState)([]);
     const [phaseIdx, setPhaseIdx] = (0, import_react3.useState)(0);
     const [phaseTick, setPhaseTick] = (0, import_react3.useState)(0);
     const priceRef = (0, import_react3.useRef)(4500);
     const tickRef = (0, import_react3.useRef)(null);
+    const microStateRef = (0, import_react3.useRef)({
+      volFactor: 1,
+      momentum: 0,
+      streak: 0,
+      lastTrueRange: ES_TICK * 4
+    });
     const reset = (0, import_react3.useCallback)(() => {
       setCandles([]);
       setPhaseIdx(0);
       setPhaseTick(0);
       priceRef.current = 4500;
+      microStateRef.current = {
+        volFactor: 1,
+        momentum: 0,
+        streak: 0,
+        lastTrueRange: ES_TICK * 4
+      };
     }, []);
     (0, import_react3.useEffect)(() => {
       reset();
@@ -24232,19 +24332,17 @@
           const volClass = rand(phase.volBias[0], phase.volBias[1]);
           const bodyClass = rand(phase.bodyBias[0], phase.bodyBias[1]);
           const tfBodyScale = { "1m": 0.6, "5m": 0.9, "15m": 1, "1h": 1.8, "1d": 4.5 }[timeframe] || 1;
-          const absVol = Math.pow(volClass / 10, 1.5) * 1e4 + Math.random() * 200;
-          const absBody = (Math.pow(bodyClass / 10, 1.2) * 12 + 0.2) * tfBodyScale;
-          const up = Math.random() < phase.directionProb;
-          const open = priceRef.current;
-          const bodyMove = absBody * (up ? 1 : -1);
-          const dojiRoll = Math.random();
-          const isDoji = dojiRoll < 0.06 && phase.id !== "ignition" && phase.id !== "bullrun" && phase.id !== "breakdown";
-          const effectiveBody = isDoji ? bodyMove * 0.15 : bodyMove;
-          const close = open + effectiveBody;
-          const wickUp = Math.abs(effectiveBody) * (0.15 + Math.random() * 0.6);
-          const wickDn = Math.abs(effectiveBody) * (0.15 + Math.random() * 0.6);
-          const high = Math.max(open, close) + wickUp;
-          const low = Math.min(open, close) - wickDn;
+          const prevClose = priceRef.current;
+          const bar = synthesizeIndexBar(
+            prevClose,
+            phase,
+            timeframe,
+            tfBodyScale,
+            volClass,
+            bodyClass,
+            microStateRef.current
+          );
+          const { open, high, low, close, vol: absVol } = bar;
           priceRef.current = close;
           const rawBody = Math.abs(close - open);
           const simulatedSpread = rawBody * profile.spreadPenalty * (0.6 + Math.random() * 0.8);
@@ -24874,22 +24972,22 @@
     const phrases = {
       "NONE|NONE": "Apathy pocket \u2014 neither continuation nor handoff is asserting.",
       "NONE|LOW": "Quiet tape with early reversal friction \u2014 watch for ignition.",
-      "NONE|MODERATE": "Exhaustion building \u2014 reversal rising without trend sponsorship.",
-      "NONE|HIGH": "Climax risk \u2014 high reversal pressure while trend strength is idle.",
+      "NONE|MODERATE": "Exhaustion building \u2014 reversal rising without continuation support.",
+      "NONE|HIGH": "Climax risk \u2014 high reversal pressure while continuation strength is idle.",
       "LOW|NONE": "Drift with continuation bias \u2014 reversal dormant.",
-      "LOW|LOW": "Two-way chop \u2014 weak trend conviction and soft reversal.",
+      "LOW|LOW": "Two-way chop \u2014 weak continuation conviction and soft reversal.",
       "LOW|MODERATE": "Late-cycle creep \u2014 continuation fading as reversal firms.",
-      "LOW|HIGH": "Blowoff forming \u2014 reversal surging into a thinning trend.",
+      "LOW|HIGH": "Blowoff forming \u2014 reversal surging into thinning continuation.",
       "MODERATE|NONE": "Steady continuation \u2014 geometric handoff quiet.",
-      "MODERATE|LOW": "Trend-led grind \u2014 minor structural disagreement.",
-      "MODERATE|MODERATE": "Tug-of-war \u2014 trend and reversal both mid-range.",
-      "MODERATE|HIGH": "High-conviction turn risk \u2014 reversal catching a live trend.",
+      "MODERATE|LOW": "Continuation-led grind \u2014 minor structural disagreement.",
+      "MODERATE|MODERATE": "Tug-of-war \u2014 continuation and reversal both mid-range.",
+      "MODERATE|HIGH": "High-conviction turn risk \u2014 reversal catching live continuation.",
       "HIGH|NONE": "Clean continuation \u2014 conviction without reversal alarm.",
-      "HIGH|LOW": "Strong trend tape \u2014 only light reversal scouts.",
-      "HIGH|MODERATE": "Trend dominant \u2014 keep an eye on building divergence.",
-      "HIGH|HIGH": "Volatile intersection \u2014 trend and reversal both elevated (potential climax)."
+      "HIGH|LOW": "Strong continuation tape \u2014 only light reversal scouts.",
+      "HIGH|MODERATE": "Continuation dominant \u2014 keep an eye on building divergence.",
+      "HIGH|HIGH": "Volatile intersection \u2014 continuation and reversal both elevated (potential climax)."
     };
-    return phrases[key] || `Trend ${trendTier} \xB7 Reversal ${reversalTier} \u2014 mixed signal space.`;
+    return phrases[key] || `Continuation ${trendTier} \xB7 Reversal ${reversalTier} \u2014 mixed signal space.`;
   }
   function reversalTierFromScore(score) {
     const pct = Math.round((score || 0) * 100);
@@ -24909,8 +25007,8 @@
     const gaugeR = 42;
     const arcCirc = Math.PI * gaugeR;
     const arcOffset = arcCirc * (1 - score);
-    const tipTrend = "Trend strength measures conviction / continuation (quadrant lock, coordinate extension toward the dominant corner, sustained volume, OBI persistence, HTF alignment). Headline direction is derived from the activation gate (Q2 vs Q4), not from voting across laws.";
-    const tipEma = regimeFilter ? "Regime filter ON: headline score uses the same asymmetric EMA as reversal to reduce single-bar flicker." : "Raw trend score (no hysteresis) while the regime filter is off.";
+    const tipTrend = "Continuation strength measures conviction (quadrant lock, coordinate extension toward the dominant corner, sustained volume, OBI persistence, HTF alignment). Headline direction is derived from the activation gate (Q2 vs Q4), not from voting across laws.";
+    const tipEma = regimeFilter ? "Regime filter ON: headline score uses the same asymmetric EMA as reversal to reduce single-bar flicker." : "Raw continuation score (no hysteresis) while the regime filter is off.";
     const tipGate = `Activation gate: need \u2265${TREND_GATE.N} of the last ${TREND_GATE.M} bars in Engine (Q2) or Wall (Q4); laws evaluate on the last ${TREND_GATE.K} bars with \u03C4=${TREND_GATE.TAU_VOL} on volume percentiles.`;
     return /* @__PURE__ */ import_react3.default.createElement(
       "div",
@@ -24924,12 +25022,12 @@
       score > 0.55 && /* @__PURE__ */ import_react3.default.createElement("div", { className: "absolute inset-0 pointer-events-none opacity-50", style: {
         background: `radial-gradient(ellipse at top left, rgba(${accentRgb},0.14), transparent 55%)`
       } }),
-      /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex items-center justify-between mb-3 relative shrink-0" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ import_react3.default.createElement(Tip, { text: tipTrend }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "inline-flex" }, /* @__PURE__ */ import_react3.default.createElement(TrendingUp, { size: 12, style: { color: score > 0.25 ? accent : "#5b6b78" }, strokeWidth: 1.5 }))), /* @__PURE__ */ import_react3.default.createElement(Tip, { text: tipTrend }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[9px] tracking-[0.25em] uppercase text-[var(--fg-dim)]" }, "Trend Detector")), trend.rawSignificant !== void 0 && /* @__PURE__ */ import_react3.default.createElement(Tip, { text: tipEma }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[8px] tracking-[0.2em] uppercase font-medium ml-1 px-1.5 py-0.5 border", style: {
+      /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex items-center justify-between mb-3 relative shrink-0" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex items-center gap-2" }, /* @__PURE__ */ import_react3.default.createElement(Tip, { text: tipTrend }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "inline-flex" }, /* @__PURE__ */ import_react3.default.createElement(TrendingUp, { size: 12, style: { color: score > 0.25 ? accent : "#5b6b78" }, strokeWidth: 1.5 }))), /* @__PURE__ */ import_react3.default.createElement(Tip, { text: tipTrend }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[9px] tracking-[0.25em] uppercase text-[var(--fg-dim)]" }, "Continuation Detector")), trend.rawSignificant !== void 0 && /* @__PURE__ */ import_react3.default.createElement(Tip, { text: tipEma }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[8px] tracking-[0.2em] uppercase font-medium ml-1 px-1.5 py-0.5 border", style: {
         borderColor: accent,
         color: accent,
         background: "rgba(34,211,238,0.06)"
       } }, "EMA"))), /* @__PURE__ */ import_react3.default.createElement(Tip, { text: tipGate }, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[8px] tracking-[0.22em] uppercase", style: { color: profile?.accent || accent } }, "Gate M=", TREND_GATE.M, " \xB7 N=", TREND_GATE.N, " \xB7 K=", TREND_GATE.K))),
-      /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex items-center gap-4 mb-3 relative shrink-0" }, /* @__PURE__ */ import_react3.default.createElement(Tip, { text: "Arc fills to composite trend strength (0\u2013100%). Faint inner arc (when visible) is raw score before regime EMA when the filter is on." }, /* @__PURE__ */ import_react3.default.createElement("svg", { viewBox: "0 0 100 56", className: "w-[110px] h-[60px] shrink-0" }, /* @__PURE__ */ import_react3.default.createElement("defs", null, /* @__PURE__ */ import_react3.default.createElement("linearGradient", { id: "trendGaugeGrad", x1: "0", x2: "1" }, /* @__PURE__ */ import_react3.default.createElement("stop", { offset: "0%", stopColor: accent, stopOpacity: "0.25" }), /* @__PURE__ */ import_react3.default.createElement("stop", { offset: "100%", stopColor: accent, stopOpacity: "1" }))), /* @__PURE__ */ import_react3.default.createElement(
+      /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex items-center gap-4 mb-3 relative shrink-0" }, /* @__PURE__ */ import_react3.default.createElement(Tip, { text: "Arc fills to composite continuation strength (0\u2013100%). Faint inner arc (when visible) is raw score before regime EMA when the filter is on." }, /* @__PURE__ */ import_react3.default.createElement("svg", { viewBox: "0 0 100 56", className: "w-[110px] h-[60px] shrink-0" }, /* @__PURE__ */ import_react3.default.createElement("defs", null, /* @__PURE__ */ import_react3.default.createElement("linearGradient", { id: "trendGaugeGrad", x1: "0", x2: "1" }, /* @__PURE__ */ import_react3.default.createElement("stop", { offset: "0%", stopColor: accent, stopOpacity: "0.25" }), /* @__PURE__ */ import_react3.default.createElement("stop", { offset: "100%", stopColor: accent, stopOpacity: "1" }))), /* @__PURE__ */ import_react3.default.createElement(
         "path",
         {
           d: `M ${50 - gaugeR} 50 A ${gaugeR} ${gaugeR} 0 0 1 ${50 + gaugeR} 50`,
@@ -24963,8 +25061,8 @@
           style: { transition: "stroke-dasharray 600ms" }
         }
       ))), /* @__PURE__ */ import_react3.default.createElement(Tip, { text: "Tier thresholds: HIGH \u226565%, MODERATE \u226540%, LOW otherwise; NONE when the gate fails or direction is unresolved.", block: true, className: "flex-1 min-w-0" }, /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[9px] tracking-[0.22em] uppercase text-[var(--fg-mute)]" }, "Conviction"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "font-['Fraunces'] italic text-[28px] leading-none tabular-nums", style: { color: accent } }, pct, /* @__PURE__ */ import_react3.default.createElement("span", { className: "text-[16px] text-[var(--fg-mute)]" }, "%")), /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[9px] tracking-[0.25em] uppercase mt-1", style: { color: dirTint } }, tier, " \xB7 ", /* @__PURE__ */ import_react3.default.createElement("span", { style: { color: accent } }, dirLabel))))),
-      /* @__PURE__ */ import_react3.default.createElement(Tip, { text: reason || "Composite from weighted trend laws (no timeframe significance multiplier in v1).", block: true, className: "mb-3 pb-3 border-b border-[var(--line)] relative min-h-[52px] shrink-0" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[10px] text-[var(--fg-dim)] leading-snug font-['Fraunces'] italic" }, tier === "NONE" && reason ? reason : `Raw stack ${rawPct}% \xB7 ${profile?.contextTag || "profile"}`)),
-      /* @__PURE__ */ import_react3.default.createElement("div", { className: "relative min-h-[168px] max-h-[168px] overflow-y-auto overflow-x-hidden space-y-1.5 pr-1" }, signals.length === 0 ? /* @__PURE__ */ import_react3.default.createElement(Tip, { text: "No law cleared the post-weight activation threshold, or the gate returned neutral.", block: true }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[10px] italic text-[var(--fg-mute)] tracking-wide" }, tier === "NONE" ? "gate idle \xB7 trend strength suppressed" : "coherence below threshold \xB7 laws not stacking")) : signals.map((s, i) => {
+      /* @__PURE__ */ import_react3.default.createElement(Tip, { text: reason || "Composite from weighted continuation laws (no timeframe significance multiplier in v1).", block: true, className: "mb-3 pb-3 border-b border-[var(--line)] relative min-h-[52px] shrink-0" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[10px] text-[var(--fg-dim)] leading-snug font-['Fraunces'] italic" }, tier === "NONE" && reason ? reason : `Raw stack ${rawPct}% \xB7 ${profile?.contextTag || "profile"}`)),
+      /* @__PURE__ */ import_react3.default.createElement("div", { className: "relative min-h-[168px] max-h-[168px] overflow-y-auto overflow-x-hidden space-y-1.5 pr-1" }, signals.length === 0 ? /* @__PURE__ */ import_react3.default.createElement(Tip, { text: "No law cleared the post-weight activation threshold, or the gate returned neutral.", block: true }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[10px] italic text-[var(--fg-mute)] tracking-wide" }, tier === "NONE" ? "gate idle \xB7 continuation strength suppressed" : "coherence below threshold \xB7 laws not stacking")) : signals.map((s, i) => {
         const subPct = Math.round(s.score * 100);
         const rawSubPct = Math.round((s.rawScore || s.score) * 100);
         const weight = s.weight || 1;
@@ -26030,7 +26128,7 @@
           regimeFilter,
           mtfConfluenceActive
         }
-      )))), /* @__PURE__ */ import_react3.default.createElement("aside", { className: "space-y-4", style: { order: isDesktop ? 0 : 3 } }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "bg-[var(--bg-alt)] border border-[var(--line)] p-5" }, /* @__PURE__ */ import_react3.default.createElement(PhaseTimeline, { phaseIdx, phaseTick, phase })), /* @__PURE__ */ import_react3.default.createElement("div", { className: "bg-[var(--bg-alt)] border border-[var(--line)] p-5" }, /* @__PURE__ */ import_react3.default.createElement(VectorTicker, { vectorHistory })), /* @__PURE__ */ import_react3.default.createElement(TrendStrengthPanel, { trend: smoothedTrendStrength, profile, regimeFilter }), /* @__PURE__ */ import_react3.default.createElement(Tip, { text: "Joint readout maps trend strength tier \xD7 reversal tier to a narrative phrase (presentation only; no additional scoring).", block: true }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "bg-[var(--bg-alt)] border border-[var(--line)] px-4 py-2.5" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[8px] tracking-[0.22em] uppercase text-[var(--fg-mute)] mb-1" }, "Joint readout \xB7 trend \xD7 reversal"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[11px] text-[var(--fg-dim)] font-['Fraunces'] italic leading-snug" }, jointTrendReversalReadout(smoothedTrendStrength.tier, reversalTierFromScore(smoothedReversal.score))))))), /* @__PURE__ */ import_react3.default.createElement("footer", { className: "mt-8 pt-4 border-t border-[var(--line)] text-[9px] tracking-[0.22em] uppercase text-[var(--fg-mute)] flex justify-between px-5" }, /* @__PURE__ */ import_react3.default.createElement("span", null, "Percentile Rank \xB7 N=", profile.lookback, " \xB7", " ", "Spread Penalty ", (profile.spreadPenalty * 100).toFixed(1), "% \xB7", " ", "Significance \xD7", profile.significanceMultiplier.toFixed(2)), /* @__PURE__ */ import_react3.default.createElement("span", null, "Simulated feed \u2014 not market data")))
+      )))), /* @__PURE__ */ import_react3.default.createElement("aside", { className: "space-y-4", style: { order: isDesktop ? 0 : 3 } }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "bg-[var(--bg-alt)] border border-[var(--line)] p-5" }, /* @__PURE__ */ import_react3.default.createElement(PhaseTimeline, { phaseIdx, phaseTick, phase })), /* @__PURE__ */ import_react3.default.createElement("div", { className: "bg-[var(--bg-alt)] border border-[var(--line)] p-5" }, /* @__PURE__ */ import_react3.default.createElement(VectorTicker, { vectorHistory })), /* @__PURE__ */ import_react3.default.createElement(TrendStrengthPanel, { trend: smoothedTrendStrength, profile, regimeFilter }), /* @__PURE__ */ import_react3.default.createElement(Tip, { text: "Joint readout maps continuation strength tier \xD7 reversal tier to a narrative phrase (presentation only; no additional scoring).", block: true }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "bg-[var(--bg-alt)] border border-[var(--line)] px-4 py-2.5" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[8px] tracking-[0.22em] uppercase text-[var(--fg-mute)] mb-1" }, "Joint readout \xB7 continuation \xD7 reversal"), /* @__PURE__ */ import_react3.default.createElement("div", { className: "text-[11px] text-[var(--fg-dim)] font-['Fraunces'] italic leading-snug" }, jointTrendReversalReadout(smoothedTrendStrength.tier, reversalTierFromScore(smoothedReversal.score))))))), /* @__PURE__ */ import_react3.default.createElement("footer", { className: "mt-8 pt-4 border-t border-[var(--line)] text-[9px] tracking-[0.22em] uppercase text-[var(--fg-mute)] flex justify-between px-5" }, /* @__PURE__ */ import_react3.default.createElement("span", null, "Percentile Rank \xB7 N=", profile.lookback, " \xB7", " ", "Spread Penalty ", (profile.spreadPenalty * 100).toFixed(1), "% \xB7", " ", "Significance \xD7", profile.significanceMultiplier.toFixed(2)), /* @__PURE__ */ import_react3.default.createElement("span", null, "Simulated feed \u2014 not market data")))
     );
   }
   function StatRow({ label, value, subvalue, suffix, accent, accentColor, title: tipTitle }) {

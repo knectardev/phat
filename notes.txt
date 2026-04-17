@@ -1,23 +1,80 @@
-The plan is solid and implementable. Two gaps worth pinning before Cursor runs with it:
+To implement an automated trading algorithm that feels authentic and decoupled from your synthetic generator, you should treat the `VWC Dynamic Matrix` as a "black box" data provider. 
 
-**1. Direction derivation should come from the gate, not law voting**
-
-The plan says "derive from the same inference used for extension + OBI majority" — but for trend strength, direction is structurally implied by the gate itself. If the gate passes because recent bars are in Q2, direction is `'bullish'`; Q4 → `'bearish'`. Mixed Q2+Q4 presence (which would be unusual but possible across M bars) could break ties by majority count. Law voting is how reversal works because its direction isn't structurally predetermined — but here it is. Pin this explicitly so the implementer doesn't build a voting loop.
-
-**2. `K` and `τ` are referenced but unspecified**
-
-Volume Expansion and OBI Persistence both reference a window `K` and threshold `τ` with no default values. Suggested starting point:
-
-| Constant | Value | Rationale |
-|----------|-------|-----------|
-| `K` | `5` | Same as M; one consistent lookback window |
-| `τ` (volPct) | `0.60` | Above median effort but not spike-only |
-| OBI sign-match count | `≥ 3 of K` | Normalized `count/K` gives 0..1 naturally |
-
-These should be defined near the M/N constants so they're all tunable in one place.
+Since your system already calculates sophisticated signals like **Trend Strength** and **Reversal Confidence**, the algorithm's job isn't to recalculate math, but to act as a **Risk and Execution Engine**.
 
 ---
 
-Everything else is well-structured. The `trendLawWeights` separation from `lawWeights` is correct (avoid cross-contamination with reversal tuning). The neutral payload shape is consistent with what the joint readout row needs. The Phase 1b callout for `smoothedTrendStrength` is clean scope management — ship the raw signal first.
+## 1. Architectural Approach: The "Broker" Layer
+To ensure the algorithm isn't "cheating," you should implement a **Broker Hook**. This layer sits between your React state and the UI, intercepting each new bar to process logic without knowing the future `PHASES` defined in your business logic.
 
-One minor observation: the plan says `coordOf` projection for Coordinate Extension, but per the MTFA plan, curvature always uses raw `c.coord`. The analogous question here is whether Coordinate Extension should also use raw coords or smoothed. Given it's measuring **path advance toward a corner** (structural), smoothed coords (`coordOf`) are appropriate — unlike curvature which is second-derivative. Just worth confirming that intent is deliberate.
+### Structural Overview
+| Component | Responsibility |
+| :--- | :--- |
+| **Signal Source** | The existing `reversal` and `trendStrength` `useMemo` outputs. |
+| **Strategy Logic** | A new `useTradingStrategy` hook that evaluates signals against entry rules. |
+| **Account Manager** | Tracks `equity`, `openPositions`, and `closedTrades` (P&L). |
+| **Risk Module** | Calculates `stopLoss` and `takeProfit` based on ATR or Matrix coordinates. |
+
+---
+
+## 2. Recommended Entry & Exit Logic
+Based on your **Section 8.0 (Joint Readout)**, you have a perfect "Decision Matrix" for entries.
+
+### The "Trend-Following" Strategy
+* **Entry Condition:** `trendTier` is **HIGH** and `reversalTier` is **NONE** or **LOW**.
+* **Direction:** Follow `trendMode`.
+* **Stop Loss:** Place at the "Value Area" or the last **Q1 (Vacuum)** coordinate low.
+* **Take Profit:** Dynamic; exit when `reversalTier` hits **MODERATE** or **HIGH**.
+
+### The "Mean Reversion" Strategy
+* **Entry Condition:** `reversalTier` is **HIGH** (Climax/Blowoff) and `trendTier` is **LOW**.
+* **Direction:** Against the current `bias`.
+* **Target:** Use the **Vacuum Snap Target** (REQ-REV-02) as the automated Take Profit level.
+
+---
+
+## 3. Implementation Blueprint
+You can add a `useBacktest` hook to your `App` component that maintains its own state, separate from the feed.
+
+```javascript
+// Implementation Concept for useBacktest.js
+const useBacktest = (currentBar, signals, settings) => {
+  const [account, setAccount] = useState({ balance: 10000, position: null, history: [] });
+
+  useEffect(() => {
+    if (!currentBar) return;
+
+    // 1. Check Exit Conditions (SL/TP)
+    if (account.position) {
+      handlePositionManagement(currentBar, account, setAccount);
+    }
+
+    // 2. Check Entry Conditions (Decoupled from Feed Logic)
+    const { trend, reversal } = signals;
+    if (!account.position && trend.tier === 'HIGH' && reversal.score < 0.3) {
+       executeEntry('LONG', currentBar.close);
+    }
+  }, [currentBar]); // Only triggers when a new bar is "emitted"
+};
+```
+
+---
+
+## 4. Visualizing Performance in your UI
+To match your high-density telemetry style, add a **"Performance Ledger"** panel next to your `Vector Stream`.
+
+1.  **Equity Curve:** A small sparkline showing `balance` over time.
+2.  **Trade Markers:** Overlay the main Price Chart with small triangles (▲/▼) where the algorithm entered/exited.
+3.  **Drawdown Metric:** Real-time calculation of the peak-to-trough decline.
+4.  **Win/Loss Ratio:** Organized by **Quadrant Entry** (e.g., "Win rate when entering in Q2: 65%").
+
+---
+
+## 5. Avoiding the "Observer Effect" (Non-Cheating)
+To ensure the algorithm is truly decoupled:
+* **Latency Simulation:** Force the algorithm to execute its trade on the *Open* of the next bar, rather than the *Close* of the bar that generated the signal.
+* **Slippage:** Use your `simulatedSpread` (REQ-FEED-02) to penalize every entry and exit. This prevents the "perfect math" trap where the bot wins simply because it's trading on theoretical mid-prices.
+* **No Phase Awareness:** Ensure the trading hook does not have access to the `PHASES` array or the `targetQuadrant` hint from the generator.
+
+
+Would you like me to refine the specific **Stop-Loss** logic based on the **Matrix Coordinates** (e.g., using Q1/Q3 boundaries as structural stops)?

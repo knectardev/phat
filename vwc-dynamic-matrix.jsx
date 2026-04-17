@@ -351,6 +351,104 @@ function generateBook(midPrice, bookBias, phaseId) {
   return { bids, asks, obi, bidTot, askTot, spread, mid: midPrice };
 }
 
+// ─── ES/MES-style synthetic OHLC (tick grid, gaps, vol clustering, fat tails) ───
+const ES_TICK = 0.25;
+
+function roundToTick(p, tick = ES_TICK) {
+  return Math.round(p / tick) * tick;
+}
+
+function randn() {
+  let u = 0;
+  let v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
+function synthesizeIndexBar(prevClose, phase, timeframe, tfBodyScale, volClass, bodyClass, state) {
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  const gapProb = {
+    '1m': 0.07, '5m': 0.09, '15m': 0.11, '1h': 0.14, '1d': 0.24,
+  }[timeframe] ?? 0.10;
+  const gapBoost = (phase.id === 'ignition' || phase.id === 'breakdown') ? 0.1 : 0;
+  const gapTickSigma = {
+    '1m': 2.2, '5m': 3.0, '15m': 4.0, '1h': 6.0, '1d': 14.0,
+  }[timeframe] ?? 3.5;
+
+  let open = prevClose;
+  if (Math.random() < gapProb + gapBoost) {
+    const ticks = Math.round(randn() * gapTickSigma + rand(-1.2, 1.2));
+    const clamped = Math.max(-32, Math.min(32, ticks));
+    open = roundToTick(prevClose + clamped * ES_TICK);
+  } else {
+    open = roundToTick(prevClose + rand(-0.5, 0.5) * ES_TICK);
+  }
+
+  const prevTR = Math.max(ES_TICK, state.lastTrueRange);
+  const normScale = tfBodyScale * 9 + 0.35;
+  const rangeVolSignal = Math.sqrt(Math.min(6, prevTR / normScale));
+  let vf = state.volFactor * (0.84 + 0.11 * rangeVolSignal + randn() * 0.04);
+  state.volFactor = Math.max(0.32, Math.min(3.4, vf));
+
+  let absBody = (Math.pow(bodyClass / 10, 1.2) * 12 + 0.2) * tfBodyScale * state.volFactor;
+
+  const tail = Math.random();
+  if (tail < 0.028) absBody *= 2.4 + Math.random() * 2.8;
+  else if (tail < 0.09) absBody *= 1.3 + Math.random() * 0.95;
+
+  const bias = phase.directionProb - 0.5;
+  state.momentum = Math.max(-1, Math.min(1,
+    state.momentum * 0.8 + bias * 0.16 + randn() * 0.09 + (Math.random() - 0.5) * 0.07));
+
+  const st = state.streak;
+  const streakFade = (st === 0 ? 0 : Math.sign(st)) * Math.min(0.24, Math.abs(st) * 0.045);
+  let pUp = 0.5 + bias * 0.92 + state.momentum * 0.4 - streakFade;
+  pUp = Math.max(0.05, Math.min(0.95, pUp));
+  const up = Math.random() < pUp;
+  const sign = up ? 1 : -1;
+
+  const isDoji = Math.random() < 0.075 && phase.id !== 'ignition' && phase.id !== 'bullrun' && phase.id !== 'breakdown';
+  const effectiveBody = isDoji ? sign * absBody * 0.11 : sign * absBody;
+
+  let close = roundToTick(open + effectiveBody);
+
+  const br = Math.abs(close - open) + ES_TICK * 0.25;
+  const wickRoll = Math.random();
+  let wu;
+  let wd;
+  if (wickRoll < 0.36) {
+    wu = br * (0.1 + Math.random() * 0.9);
+    wd = br * (0.1 + Math.random() * 0.9);
+  } else if (wickRoll < 0.62) {
+    wu = br * (0.42 + Math.random() * 1.55);
+    wd = br * (0.05 + Math.random() * 0.42);
+  } else {
+    wu = br * (0.05 + Math.random() * 0.42);
+    wd = br * (0.42 + Math.random() * 1.55);
+  }
+
+  let high = roundToTick(Math.max(open, close) + wu);
+  let low = roundToTick(Math.min(open, close) - wd);
+  if (high <= Math.max(open, close)) high = roundToTick(Math.max(open, close) + ES_TICK);
+  if (low >= Math.min(open, close)) low = roundToTick(Math.min(open, close) - ES_TICK);
+
+  const trueRange = high - low;
+  state.lastTrueRange = trueRange;
+
+  if (close > open) state.streak = st >= 0 ? st + 1 : 1;
+  else if (close < open) state.streak = st <= 0 ? st - 1 : -1;
+  else state.streak = 0;
+
+  const baseVol = Math.pow(volClass / 10, 1.5) * 10000;
+  const rangeNorm = trueRange / (tfBodyScale * 10 + 0.25);
+  const activity = 0.52 + 0.9 * Math.tanh(rangeNorm * 1.05) + state.volFactor * 0.12;
+  const absVol = Math.max(400, baseVol * activity + Math.exp(randn() * 0.11) * 220);
+
+  return { open, high, low, close, vol: absVol, trueRange };
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  CANDLE GENERATOR — scripted cycle
 // ═══════════════════════════════════════════════════════════════
@@ -361,12 +459,24 @@ function useScriptedFeed(playing, speed, timeframe) {
   const [phaseTick, setPhaseTick] = useState(0);
   const priceRef = useRef(4500);    // starting price (ES-ish)
   const tickRef = useRef(null);
+  const microStateRef = useRef({
+    volFactor: 1,
+    momentum: 0,
+    streak: 0,
+    lastTrueRange: ES_TICK * 4,
+  });
 
   const reset = useCallback(() => {
     setCandles([]);
     setPhaseIdx(0);
     setPhaseTick(0);
     priceRef.current = 4500;
+    microStateRef.current = {
+      volFactor: 1,
+      momentum: 0,
+      streak: 0,
+      lastTrueRange: ES_TICK * 4,
+    };
   }, []);
 
   // Reset when timeframe changes — different lookback means different ranking
@@ -385,37 +495,25 @@ function useScriptedFeed(playing, speed, timeframe) {
         const phase = PHASES[phaseIdx];
         const rand = (min, max) => min + Math.random() * (max - min);
 
-        // Generate raw vol and body pct class
         const volClass = rand(phase.volBias[0], phase.volBias[1]);
         const bodyClass = rand(phase.bodyBias[0], phase.bodyBias[1]);
 
-        // Map classes to absolute values (arbitrary scale — percentile rank does the real work).
-        // Scale body by timeframe: longer timeframes produce larger absolute ranges.
         const tfBodyScale = { '1m': 0.6, '5m': 0.9, '15m': 1.0, '1h': 1.8, '1d': 4.5 }[timeframe] || 1.0;
-        const absVol = Math.pow(volClass / 10, 1.5) * 10000 + Math.random() * 200;
-        const absBody = (Math.pow(bodyClass / 10, 1.2) * 12 + 0.2) * tfBodyScale;
 
-        // Direction
-        const up = Math.random() < phase.directionProb;
-        const open = priceRef.current;
-        const bodyMove = absBody * (up ? 1 : -1);
+        const prevClose = priceRef.current;
+        const bar = synthesizeIndexBar(
+          prevClose,
+          phase,
+          timeframe,
+          tfBodyScale,
+          volClass,
+          bodyClass,
+          microStateRef.current,
+        );
 
-        // Occasional small dojis inside a phase (market texture)
-        const dojiRoll = Math.random();
-        const isDoji = dojiRoll < 0.06 && phase.id !== 'ignition' && phase.id !== 'bullrun' && phase.id !== 'breakdown';
-        const effectiveBody = isDoji ? bodyMove * 0.15 : bodyMove;
-
-        const close = open + effectiveBody;
-        // Wicks proportional to body but with noise
-        const wickUp = Math.abs(effectiveBody) * (0.15 + Math.random() * 0.6);
-        const wickDn = Math.abs(effectiveBody) * (0.15 + Math.random() * 0.6);
-        const high = Math.max(open, close) + wickUp;
-        const low  = Math.min(open, close) - wickDn;
-
+        const { open, high, low, close, vol: absVol } = bar;
         priceRef.current = close;
 
-        // Bid-ask spread — meaningful on microstructure timeframes, negligible on daily.
-        // Scaled as a fraction of body; consumed by percentile ranking below.
         const rawBody = Math.abs(close - open);
         const simulatedSpread = rawBody * profile.spreadPenalty * (0.6 + Math.random() * 0.8);
 
