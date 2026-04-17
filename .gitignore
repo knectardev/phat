@@ -1,1 +1,4 @@
 node_modules/
+
+# Generated for Vercel static output (see scripts/sync-public.cjs)
+public/
