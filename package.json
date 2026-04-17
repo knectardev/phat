@@ -3,6 +3,7 @@
   "private": true,
   "description": "Build scripts for VWC demo bundle only; end users open demo/vwc-matrix-demo.html without running npm.",
   "scripts": {
+    "build": "npm run build:demo",
     "build:demo": "tailwindcss -c demo/tailwind.config.cjs -i demo/tw-input.css -o demo/vwc-matrix-demo.css --minify && esbuild demo/demo-entry.jsx --bundle --outfile=demo/vwc-matrix-demo.bundle.js --format=iife --platform=browser --loader:.jsx=jsx --jsx=transform"
   },
   "dependencies": {
