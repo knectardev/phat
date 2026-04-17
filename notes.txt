@@ -1,0 +1,23 @@
+The plan is solid and implementable. Two gaps worth pinning before Cursor runs with it:
+
+**1. Direction derivation should come from the gate, not law voting**
+
+The plan says "derive from the same inference used for extension + OBI majority" — but for trend strength, direction is structurally implied by the gate itself. If the gate passes because recent bars are in Q2, direction is `'bullish'`; Q4 → `'bearish'`. Mixed Q2+Q4 presence (which would be unusual but possible across M bars) could break ties by majority count. Law voting is how reversal works because its direction isn't structurally predetermined — but here it is. Pin this explicitly so the implementer doesn't build a voting loop.
+
+**2. `K` and `τ` are referenced but unspecified**
+
+Volume Expansion and OBI Persistence both reference a window `K` and threshold `τ` with no default values. Suggested starting point:
+
+| Constant | Value | Rationale |
+|----------|-------|-----------|
+| `K` | `5` | Same as M; one consistent lookback window |
+| `τ` (volPct) | `0.60` | Above median effort but not spike-only |
+| OBI sign-match count | `≥ 3 of K` | Normalized `count/K` gives 0..1 naturally |
+
+These should be defined near the M/N constants so they're all tunable in one place.
+
+---
+
+Everything else is well-structured. The `trendLawWeights` separation from `lawWeights` is correct (avoid cross-contamination with reversal tuning). The neutral payload shape is consistent with what the joint readout row needs. The Phase 1b callout for `smoothedTrendStrength` is clean scope management — ship the raw signal first.
+
+One minor observation: the plan says `coordOf` projection for Coordinate Extension, but per the MTFA plan, curvature always uses raw `c.coord`. The analogous question here is whether Coordinate Extension should also use raw coords or smoothed. Given it's measuring **path advance toward a corner** (structural), smoothed coords (`coordOf`) are appropriate — unlike curvature which is second-derivative. Just worth confirming that intent is deliberate.
