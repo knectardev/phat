@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<!--
+  L2-Ghost Matrix — standalone demo (no npm required to VIEW).
+
+  Open this file in a modern browser. If styles/scripts fail under file://,
+  serve the demo folder:  npx --yes serve . -p 3456  (from demo/) then open
+  http://localhost:3456/l2ghost-demo.html
+
+  Rebuild bundle + CSS after editing ../vwc-dynamic-matrix-l2ghost.jsx:
+    From repo root (c:\local_dev\phat):  npm install  (once)  then  npm run build:l2ghost
+
+  Axes:
+    Y — Price Phatness   (percentile rank of executed volume)
+    X — Ghost Phatness   (percentile rank of total L2 depth within ±0.5% of mid)
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>L2-Ghost Matrix — Demo</title>
+  <link rel="stylesheet" href="./l2ghost-demo.css" />
+</head>
+<body class="m-0 antialiased">
+  <div id="root"></div>
+  <script src="./l2ghost-demo.bundle.js"></script>
+</body>
+</html>

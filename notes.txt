@@ -1,80 +1,104 @@
-To implement an automated trading algorithm that feels authentic and decoupled from your synthetic generator, you should treat the `VWC Dynamic Matrix` as a "black box" data provider. 
+Got it — that's a meaningful pivot and actually much cleaner than trying to layer the ghost *onto* the existing matrix. Thanks for the clarification; it changes the prompt substantially.
 
-Since your system already calculates sophisticated signals like **Trend Strength** and **Reversal Confidence**, the algorithm's job isn't to recalculate math, but to act as a **Risk and Execution Engine**.
+## What this pivot actually means
 
----
+You're not adding a second layer to the existing PHAT demo. You're **replacing** the current matrix (Effort × Result, with the Wyckoff laws and named transitions built on top of it) with a new matrix whose axes are **Executed Volume × L2 Depth**. That's a different conceptual model — one where the coordinates tell you about *execution vs. resting intent*, not *effort vs. result*.
 
-## 1. Architectural Approach: The "Broker" Layer
-To ensure the algorithm isn't "cheating," you should implement a **Broker Hook**. This layer sits between your React state and the UI, intercepting each new bar to process logic without knowing the future `PHASES` defined in your business logic.
+Everything built on the old axes becomes irrelevant or needs re-derivation:
+- Quadrant names: Vacuum/Engine/Apathy/Wall → new names like Slip/Engine/Coherence/Hidden Floor
+- Named vector transitions: Fake-out/Confirmation/Climax/Exhaustion/Ignition/Thinning are all defined against the old axes and don't port over
+- The five reversal laws (Fat Reversal, Vacuum Snap, Curvature, Divergence, Liquidity Divergence) were tuned for Effort×Result and would need to be rewritten for Volume×Depth
+- The Heikin-Ashi regime filter, HMA smoothing, and trend-persistent bias — these apply to any candle series, so they survive intact
+- The cell glyph inside each matrix cell becomes the **dual-layer candle** (price + ghost) rather than the single volume-weighted candle
 
-### Structural Overview
-| Component | Responsibility |
-| :--- | :--- |
-| **Signal Source** | The existing `reversal` and `trendStrength` `useMemo` outputs. |
-| **Strategy Logic** | A new `useTradingStrategy` hook that evaluates signals against entry rules. |
-| **Account Manager** | Tracks `equity`, `openPositions`, and `closedTrades` (P&L). |
-| **Risk Module** | Calculates `stopLoss` and `takeProfit` based on ATR or Matrix coordinates. |
+So the prompt to Cursor needs to be framed as a **substitutional** rebuild, not additive. This is important because if you tell Cursor "add L2 ghost candles to the demo" without being explicit about the axis replacement, it will try to preserve the existing matrix and layer ghosts on top, which is incoherent given your new axes.
 
----
+## Your prompt, rewritten for this pivot
 
-## 2. Recommended Entry & Exit Logic
-Based on your **Section 8.0 (Joint Readout)**, you have a perfect "Decision Matrix" for entries.
-
-### The "Trend-Following" Strategy
-* **Entry Condition:** `trendTier` is **HIGH** and `reversalTier` is **NONE** or **LOW**.
-* **Direction:** Follow `trendMode`.
-* **Stop Loss:** Place at the "Value Area" or the last **Q1 (Vacuum)** coordinate low.
-* **Take Profit:** Dynamic; exit when `reversalTier` hits **MODERATE** or **HIGH**.
-
-### The "Mean Reversion" Strategy
-* **Entry Condition:** `reversalTier` is **HIGH** (Climax/Blowoff) and `trendTier` is **LOW**.
-* **Direction:** Against the current `bias`.
-* **Target:** Use the **Vacuum Snap Target** (REQ-REV-02) as the automated Take Profit level.
+Here's how I would rewrite what you wrote, keeping your voice and structure but making it unambiguous for Cursor:
 
 ---
 
-## 3. Implementation Blueprint
-You can add a `useBacktest` hook to your `App` component that maintains its own state, separate from the feed.
-
-```javascript
-// Implementation Concept for useBacktest.js
-const useBacktest = (currentBar, signals, settings) => {
-  const [account, setAccount] = useState({ balance: 10000, position: null, history: [] });
-
-  useEffect(() => {
-    if (!currentBar) return;
-
-    // 1. Check Exit Conditions (SL/TP)
-    if (account.position) {
-      handlePositionManagement(currentBar, account, setAccount);
-    }
-
-    // 2. Check Entry Conditions (Decoupled from Feed Logic)
-    const { trend, reversal } = signals;
-    if (!account.position && trend.tier === 'HIGH' && reversal.score < 0.3) {
-       executeEntry('LONG', currentBar.close);
-    }
-  }, [currentBar]); // Only triggers when a new bar is "emitted"
-};
-```
+> **Fork the PHAT demo at https://phat-drab.vercel.app/ to replace the current Effort×Result matrix with a new L2-Ghost matrix.**
+>
+> The existing matrix uses Volume percentile (X) × Body Range percentile (Y). We are replacing this with a new coordinate system:
+>
+> - **Y-axis (1–10): Price Phatness** — percentile rank of executed volume across the rolling window
+> - **X-axis (1–10): Ghost Phatness** — percentile rank of total L2 depth across the rolling window
+>
+> This is a substitutional rebuild. The named quadrants (Vacuum/Engine/Apathy/Wall), the six named vector transitions (Fake-out/Confirmation/Climax/Exhaustion/Ignition/Thinning), and the five reversal laws (Fat Reversal, Vacuum Snap, Curvature, Divergence, Liquidity Divergence) are all defined against the old axes and do not port over. They should be removed or stubbed out, not adapted.
+>
+> **Keep intact:** the Heikin-Ashi computation, HMA coordinate smoothing, trend-persistent bias, confidence hysteresis EMA, Regime Filter toggle, timeframe selector, and all layout/responsive infrastructure. These apply to any candle series regardless of what the axes represent.
+>
+> **New quadrant names** (derived from the L2-Ghost prototype at `/uploads/fractal_phatness_matrix.html`):
+>
+> - (10, 1) — **The Slip**: Phat price, hollow ghost. Execution through a thin book.
+> - (10, 10) — **Institutional Buy**: Phat price, phat ghost. Execution matches infrastructure.
+> - (1, 10) — **Hidden Floor**: Anemic price, phat ghost. Silent accumulation.
+> - (5, 5) — **Coherence**: Balanced on both axes. Coiled spring.
+> - Full 100-cell name table as provided in `fractal_phatness_matrix.html` lines 599–697.
+>
+> **Cell glyph (rendered inside each matrix cell):** a dual-layer candle SVG. Ghost drawn first as translucent rectangle; price candle drawn second at higher opacity. Both share the same vertical center and price axis. Ghost width = L2 depth percentile, price width = volume percentile. Colors per the decoupled rules below.
+>
+> **Color decoupling (fixes the "everything red" issue):**
+>
+> ```
+> priceColor:
+>   V/D < 0.8  → teal (#21a095)   // depth exceeds volume — absorption
+>   V/D > 1.2  → red  (#fb7185)   // volume exceeds depth — distribution  
+>   else       → gray (#7a8195)   // balanced
+>
+> ghostColor: computed independently from book imbalance (bid depth vs ask depth)
+>   bidDepth > askDepth * 1.2  → cyan (#00d9ff)
+>   askDepth > bidDepth * 1.2  → red  (#fb7185)
+>   else                       → gray (#a0a9b8)
+> ```
+>
+> The independence is deliberate: a green price inside a red ghost is a Phake-Out; a green price inside a cyan ghost is a Real-Break.
+>
+> **Data requirements.** The current scripted feed's `generateBook()` returns `{bids[], asks[], obi}`. Extend it to also emit aggregated depth metrics:
+>
+> ```json
+> {
+>   "l2": {
+>     "bidDepth": <sum of bid sizes within ±0.5% of mid>,
+>     "askDepth": <sum of ask sizes within ±0.5% of mid>,
+>     "totalDepth": <bidDepth + askDepth>,
+>     "bookImbalance": <(bidDepth - askDepth) / totalDepth>,
+>     "snapshotTime": "bar_open"
+>   }
+> }
+> ```
+>
+> Depth percentile for the X-axis is computed as rolling-window percentile of `totalDepth`, matching how volume percentile is computed on the Y-axis.
+>
+> **File-scope:** changes should be confined to
+> 1. `useScriptedFeed` hook — emit the new `l2` object per bar
+> 2. Matrix quadrant/coordinate computation — swap axis semantics
+> 3. Matrix cell rendering — new dual-layer candle glyph
+> 4. Quadrant labels and cell taxonomy data — full replacement
+> 5. Reversal Detector and Continuation Detector — stub out or remove the old laws; leave the components in place with "Law set pending re-derivation for L2 axes" placeholder
+>
+> Do not modify: Regime Filter, timeframe selector, layout grid, responsive breakpoints, tape chart, depth heatmap sidebar, cycle timeline, or styling.
+>
+> **Acceptance criteria:**
+> - Each matrix cell renders a dual-layer candle (ghost + price)
+> - Cell at (10,1) visually matches "The Slip" archetype; cell at (1,10) matches "Hidden Floor"; cell at (5,5) matches "Coherence"
+> - Hovering a cell shows its new name from the 100-cell taxonomy
+> - Ghost color can differ from price color — produce at least one visible Phake-Out scenario in the scripted cycle
+> - Regime Filter toggle continues to work (HA + HMA + hysteresis)
+> - Timeframe selector continues to work
+> - No console errors, existing responsive layout preserved
 
 ---
 
-## 4. Visualizing Performance in your UI
-To match your high-density telemetry style, add a **"Performance Ledger"** panel next to your `Vector Stream`.
+That's a prompt Cursor can run with and produce something close to correct on first pass. The critical unlocks are: explicit framing as a substitution (not addition), explicit retention list (so Cursor doesn't touch the infrastructure you like), explicit removal/stub list (so Cursor doesn't try to salvage laws that no longer apply), and explicit file-scope.
 
-1.  **Equity Curve:** A small sparkline showing `balance` over time.
-2.  **Trade Markers:** Overlay the main Price Chart with small triangles (▲/▼) where the algorithm entered/exited.
-3.  **Drawdown Metric:** Real-time calculation of the peak-to-trough decline.
-4.  **Win/Loss Ratio:** Organized by **Quadrant Entry** (e.g., "Win rate when entering in Q2: 65%").
+## Two honest caveats
 
----
+**The reversal and continuation detectors become dead weight** until you re-derive their laws for the new axes. The old laws were elegant because Effort×Result maps naturally onto Wyckoff's central analytic framework. Volume×Depth is a different analytic framework (closer to Larry Harris's market microstructure) and its laws are not a simple translation. You'll eventually want laws like "Ghost Divergence" (price color vs. ghost color mismatch) or "Depth Collapse" (ghost width contracting over N bars while price width grows). But those are new designs, not ports. Stubbing them out for now is the right move.
 
-## 5. Avoiding the "Observer Effect" (Non-Cheating)
-To ensure the algorithm is truly decoupled:
-* **Latency Simulation:** Force the algorithm to execute its trade on the *Open* of the next bar, rather than the *Close* of the bar that generated the signal.
-* **Slippage:** Use your `simulatedSpread` (REQ-FEED-02) to penalize every entry and exit. This prevents the "perfect math" trap where the bot wins simply because it's trading on theoretical mid-prices.
-* **No Phase Awareness:** Ensure the trading hook does not have access to the `PHASES` array or the `targetQuadrant` hint from the generator.
+**The 100-cell name table from the Fractal Phatness prototype is uneven in quality.** Some names are evocative and distinct (The Slip, Hidden Floor, Coherence, Wall Build). Others are generic or redundant (Drift, Coil, Steady, Moderate). When you integrate, you may want to curate — keep maybe 25–30 genuinely distinct archetypes and leave the other cells un-named or inherited from their neighbors. But that's a second-pass editorial decision; for the initial Cursor fork, use the full table as-is.
 
 
-Would you like me to refine the specific **Stop-Loss** logic based on the **Matrix Coordinates** (e.g., using Q1/Q3 boundaries as structural stops)?
+**Also, please add a "Divergence Glow" to the cell if priceColor !== ghostColor. This will make the "Phake-Outs" jump off the screen in the demo, proving the value of the L2 Ghost model instantly.

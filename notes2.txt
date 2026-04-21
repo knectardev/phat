@@ -1,0 +1,99 @@
+Good questions, both load-bearing. Let me give you my answer on each with reasoning, not just a letter.
+
+## Question 1 — Taxonomy reconciliation
+
+**Go with C (Hybrid).** Here's why, and here's how I'd tighten it.
+
+The prototype's 100-cell table is a *dense* taxonomy — it's trying to give every cell a plausible name so the matrix feels populated. But most of those names (Drift, Coil, Moderate, Soft, Building, etc.) are workmanlike rather than archetypal. They exist to fill space.
+
+The notes' four archetypes are different in kind. They're not entries in a dense taxonomy; they're **pedagogical poles** — the four cells a user needs to understand before the matrix makes sense as a system. The Slip at (10,1) isn't a better name for (10,5) — it's a statement that "maximum execution with minimum infrastructure" is the theoretically extremal version of the Slip concept, and the prototype's placement at (10,5) was a UI compromise (they didn't want corner cells looking too empty or alarming in the demo layout).
+
+So these aren't two versions of the same taxonomy — they're two **different layers of taxonomy** that should coexist:
+
+- **The dense layer** (prototype's 100 names) tells you what cell you're in right now, like labeled regions of a map.
+- **The archetype layer** (notes' four corners) tells you how far you are from each conceptual extreme — like the cardinal compass directions.
+
+Option C makes both visible. Hovering a cell still shows its dense-taxonomy name ("Conviction Gap" at 10,5). But the four corners get visual emphasis that makes them legible as *orientational anchors* — a slight glow, a small badge, maybe the archetype name rendered in italic below the dense name.
+
+**One refinement I'd make to your Option C wording:** don't put Coherence at (5,5). (5,5) is the *center* of the matrix, not an extreme corner. Putting "Coherence" there actually works philosophically (it's the balance point), but it's not stylistically consistent with the other three archetypes which are corners. Two cleaner options:
+
+1. Drop Coherence from the archetype layer entirely — it's the center, and the center doesn't need a corner-style archetype label. Let the prototype's "Climax/Mixed" name stand at (5,5), which is fine.
+2. Keep Coherence but label it the "Origin" or "Equilibrium" rather than a corner archetype, and give it a *different* visual treatment — maybe a subtle central ring rather than a corner glow.
+
+Either works. My preference is (2) — Coherence is genuinely important enough to annotate, and having a fifth anchor (center + four corners) is a natural diagram.
+
+**Concrete implementation for Cursor:**
+
+```
+Archetype overlay: four corners + one center.
+  (10, 1)  "The Slip"         — corner, amber-gold glow, italic subscript on hover
+  (10, 10) "Institutional Buy" — corner, amber-gold glow, italic subscript on hover
+  (1, 10)  "Hidden Floor"      — corner, amber-gold glow, italic subscript on hover
+  (1, 1)   (unused / could add "The Drift" or similar if desired)
+  (5, 5)   "Coherence"         — center, subtle ring outline, italic subscript on hover
+
+Each cell's dense-taxonomy name (from stateData) remains the primary label.
+Archetype name appears as italic serif beneath the dense name in annotated cells only.
+```
+
+## Question 2 — Depth aggregation window
+
+**Go with C (Both).** This is the cheap and correct answer.
+
+The two metrics genuinely measure different things and both have legitimate uses:
+
+- **Closest-10 depth** (existing `bidTot`/`askTot`) → book imbalance signal (OBI). This is what you want for reading bid-vs-ask asymmetry because it's local to the spread where real trades happen.
+- **±0.5%-of-mid depth** → total liquidity infrastructure. This is what you want for ghost-width percentile ranking because it captures the full resting queue, not just the top of book.
+
+Using closest-10 for percentile ranking would produce a ghost that tracks OBI too closely — you'd lose the independence between price and ghost that makes the Phake-Out detection work. Using ±0.5% for OBI would smear out the imbalance signal across depth levels where orders are more likely to be stale or probabilistic.
+
+So they're not redundant; they're complementary. Keep both. Cost is negligible — one extra reduce pass in `generateBook()`.
+
+One implementation detail worth spelling out for Cursor: the ±0.5% band needs to scale with price volatility or it'll be useless at different price levels. For the synthetic feed at MES/ES prices (~4500), ±0.5% is ~$22.50, which is reasonable. But if the user switches to a lower-priced symbol, ±0.5% might capture zero levels (bands too tight) or the entire book (bands too loose). The pragmatic solution: **compute the band as ±max(0.5% of mid, N ticks)** where N is maybe 20–40 depending on instrument. For the scripted feed this is trivially solvable because it's always simulating one price regime.
+
+**Concrete implementation for Cursor:**
+
+```javascript
+// Inside generateBook(), after bids[] and asks[] are generated:
+
+const midPrice = (bids[0].price + asks[0].price) / 2;
+const bandSize = Math.max(midPrice * 0.005, 20); // 0.5% or 20 ticks, whichever larger
+
+const bidDepthBand = bids
+  .filter(b => b.price >= midPrice - bandSize)
+  .reduce((sum, b) => sum + b.size, 0);
+  
+const askDepthBand = asks
+  .filter(a => a.price <= midPrice + bandSize)
+  .reduce((sum, a) => sum + a.size, 0);
+
+return {
+  bids,
+  asks,
+  // existing aggregates — DO NOT RENAME, used by OBI and existing callers
+  bidTot: <closest-10 sum>,   
+  askTot: <closest-10 sum>,
+  obi: <existing formula>,
+  
+  // NEW — for ghost width percentile ranking only
+  l2: {
+    bidDepth: bidDepthBand,
+    askDepth: askDepthBand,
+    totalDepth: bidDepthBand + askDepthBand,
+    bookImbalance: (bidDepthBand - askDepthBand) / (bidDepthBand + askDepthBand),
+    snapshotTime: 'bar_open',
+  }
+};
+```
+
+That keeps every existing caller untouched while adding the new field under a namespaced key.
+
+---
+
+## Meta-observation
+
+Both of these questions have the same underlying shape: **"the notes and the prototype disagree — which is canonical?"** The honest answer in both cases is *neither, because they're measuring different things that happen to share a name*. The notes describe the theoretical/pedagogical structure; the prototype describes an implementation compromise. Your app should express the pedagogy clearly (so users understand what the matrix *means*) while inheriting the implementation details (so the thing actually works).
+
+This will probably keep happening. Whenever the notes and the prototype diverge, ask: is the notes describing the *intent* and the prototype a *rendering*? If yes, the notes are canonical for semantics and the prototype is canonical for mechanics. If it's actually a substantive disagreement about what the right answer is, you'll know because neither version will feel obviously more correct.
+
+Both of these cases fell into the first category. My guess is most future ones will too.

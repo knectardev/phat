@@ -1,0 +1,93 @@
+Yes — a few issues worth catching before execution. Most are minor, two are substantive. Let me go in order of severity.
+
+## Substantive issues
+
+### 1. Section 5's glyph math will collapse the matrix visually
+
+The plan says:
+
+> `priceWidthPct = 20 + (y/5) * 60`, `ghostWidthPct = 20 + (x/5) * 60`
+> ...and `a common height derived from y so the cell-glyph coordinate semantics stay consistent with the old version's shape-encoding`.
+
+This is wrong in a way that matters. If both price width *and* candle height are driven by `y`, then the glyph only has one effective dimension of variation per row — `y` controls two visuals, and `x` only controls ghost width. You lose the visual independence that makes the matrix legible.
+
+Worse: the decoupled color logic says priceColor depends on `V/D = y/x`. If y=10 and x=1, the cell shows a giant price rect over a tiny ghost — but also computes V/D=10, forcing red. Every cell in column 1 becomes red regardless of row. Every cell in row 1 becomes teal. The color grid collapses into a rigid function of position, with no noise, no variation.
+
+Looking back at the Fractal Phatness prototype: the prototype worked around this by introducing `heightRandomness` and `bookImbalance = sin(l2Depth * 0.7 + priceVol * 0.3)`. That's a *demo trick* to make the grid look varied — not a model. Porting it verbatim into your actual production-intent matrix means you're shipping a visualization whose cell appearance is semi-deterministic from coordinates, which defeats the purpose of showing real execution vs. intent divergence.
+
+**What should actually happen:** each cell should render the *archetypal* candle for its coordinate, not a randomized one. That means:
+
+- **Ghost width** = f(x) — deterministic from X axis. Cell at x=10 has a phat ghost regardless of row.
+- **Price width** = f(y) — deterministic from Y axis. Cell at y=10 has a phat price regardless of column.
+- **Height** = should be the *same* for every cell because it represents "one bar's price move" and the matrix is a phase space, not a time series. Maybe slight variation to make the glyphs feel alive, but it should not encode meaning.
+- **Colors** = f(x, y) via the decoupling rule, deterministic.
+
+The glyphs will look more sterile than the prototype did, but they'll be *correct*. The matrix is a reference diagram; it should read like a periodic table, not a randomized demo.
+
+Tell Cursor: **"Cell glyph height is a constant per cell — do not derive it from y. Price width derives from y only. Ghost width derives from x only. Do not port the prototype's `heightRandomness` or sin-based imbalance — those were demo dressing."**
+
+### 2. Section 4's "Hidden Floor zone" / "Slip zone" quadrant labels conflict with Section 6's archetypes
+
+The plan stubs `L2_QUAD_META` with labels "Slip zone," "Engine zone," "Hidden Floor zone," "Lull." But Section 6 then assigns archetypes to specific corners — including "The Slip" at (10,1) and "Hidden Floor" at (1,10).
+
+The problem is that "Slip zone" as a *quadrant-level* label (covering all 25 cells in Q1) implies that every cell in that quadrant is slip-like. But the whole pedagogical point of the archetype overlay is that only the corner is the extremal archetype — the other 24 cells in that quadrant are graduations *toward* the archetype.
+
+Using the archetype name as the quadrant name muddles this. You get weird tooltip collisions: cell (8,3) is inside the "Slip zone" quadrant but its STATE_DATA name is "Unwind" and it's not The Slip archetype. Now you have three overlapping name systems per cell.
+
+Two fixes, both better than the current plan:
+
+**Option A (cleaner):** Drop quadrant labels entirely. The matrix has four quadrants structurally, but they don't need named labels when the archetype-corner glows already give orientation. Remove `L2_QUAD_META` labels; just keep the color tints if they serve visual purpose, or drop those too.
+
+**Option B (keep quadrant semantics):** Name quadrants descriptively, not archetype-ally: "Executed & Unsupported" (Q1), "Executed & Supported" (Q2), "Dormant" (Q3), "Resting Depth" (Q4). Or compass labels: NW/NE/SW/SE. Anything that doesn't step on the archetype names.
+
+Tell Cursor: **"Quadrant labels should not reuse archetype names. Either drop quadrant-level labels entirely, or use descriptive/structural names that don't collide with the four corner archetypes."** I'd go with Option A myself.
+
+## Minor issues
+
+### 3. Section 4's `VECTOR_NAMES = {}` — check what breaks
+
+The plan says the VectorTicker will "render an empty list" when the lookup misses. That's probably fine, but make sure the `VectorTicker` component handles an empty vector stream gracefully — it might render a "No transitions detected" placeholder, or it might render nothing at all and leave a collapsed empty panel that looks broken.
+
+Tell Cursor: **"When `VECTOR_NAMES` is empty, VectorTicker should render a minimal 'Vector taxonomy pending re-derivation for L2 axes' placeholder, consistent with how Reversal Detector and Continuation Detector handle the pending state. Do not render an empty panel."**
+
+### 4. Section 2's `TICK` reference needs verification
+
+The plan writes `20 * TICK` for the depth band floor, but the existing file may not have a `TICK` constant defined at that scope. `generateBook()` generates synthetic book levels at incremental prices — whatever that increment is, use it directly, or define `TICK` as a clearly-named constant near `generateBook`. Don't leave Cursor to grep for a `TICK` that may not exist.
+
+Tell Cursor: **"Verify `TICK` is defined and in scope for `generateBook()`. If not, define a local `const TICK = 0.25;` (or whatever matches the existing level-generation step) at the top of the function."**
+
+### 5. Section 6's `(1,1) intentionally unlabeled` — but the prototype stateData has a name there
+
+The prototype's stateData has `'1_1': { name: 'Void', desc: 'Weightless', quad: 'q3' }`. The plan says (1,1) is "intentionally unlabeled" per notes2.txt — but this only means no *archetype* label, not no *dense* label. STATE_DATA at 1_1 should still render "Void / Weightless" on hover.
+
+This is probably what Cursor intends anyway, but the wording is ambiguous enough to cause a miss. Clarify:
+
+> **"(1,1) has no archetype overlay. Its dense taxonomy name 'Void' from STATE_DATA still renders in the tooltip like every other cell."**
+
+### 6. The active/trail cell highlighting claim needs a second look
+
+Section 5 says: *"The active/trail cell highlighting ring in Matrix stays untouched — it already keys off `activeCoord` and works regardless of glyph contents."*
+
+This is true as stated, but *what* `activeCoord` means has changed. It used to mean (volPct, bodyPct); it now means (depthPct, volPct). The ring will still render correctly, but the *semantic interpretation* of the live cell being highlighted is now different. Not a bug, but worth flagging that the "current cell" the user sees lit up is now answering a different question.
+
+### 7. `snapshotTime: 'bar_open'` is decorative, not functional
+
+The plan carries this field through but doesn't use it for anything. Either remove it or wire it up to something (e.g., the DepthHeatmap could annotate when the snapshot was taken). Right now it's just dead data.
+
+### 8. Build/smoke test section is thin
+
+> *"at least one cell in the grid exhibits a Phake-Out (priceColor !== ghostColor) and gets a Divergence Glow"*
+
+One cell isn't a great test — if the glyph logic is broken, exactly one cell might still pass by coincidence. Add:
+
+> *"Count the number of Phake-Out cells across the 100-cell grid. Expect 20–60 based on the color decoupling math; flag if the count is <10 (suggests color logic is constrained by coordinates) or >80 (suggests colors are essentially random)."*
+
+## Overall verdict
+
+The plan's **architecture is right** — forking as a new file, preserving the existing demo, namespacing the `l2` object, stubbing out instead of deleting the detectors. Those are all correct calls.
+
+The **semantics have one real bug** (the glyph height coupling in Section 5) and **one structural muddle** (quadrant labels vs. archetype names in Section 4). Fix those before execution.
+
+Everything else is polish. If Cursor implements the plan as written, you'll get a working demo — but the matrix cells will look randomized in a way that doesn't correspond to meaning, and tooltips will have naming collisions. Both fixable in a single review pass after the first build, but easier to head off now.
+
+Want me to rewrite the two problem sections in the exact wording you should paste into Cursor?

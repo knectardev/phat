@@ -1,0 +1,2666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A Catalog of Candlestick Reversal Patterns — with Volume-Weighted Counterparts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=JetBrains+Mono:wght@300;400;500&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Dark editorial palette — "private library at night" */
+    --paper: #14110d;           /* deep ink-black with faint warmth */
+    --paper-dark: #1d1915;      /* slightly lighter panels */
+    --paper-raised: #1f1a14;    /* specimen plate background */
+    --ink: #e8dfc9;             /* warm cream, main body text */
+    --ink-mid: #a89d85;         /* secondary text */
+    --ink-fade: #6b6253;        /* tertiary, muted */
+    --rule: #2f2822;            /* hairline separators */
+    --rule-strong: #3d332a;     /* stronger separators */
+    --accent: #d85a5a;          /* luminous ink-red for emphasis */
+    --gold: #d4a84b;            /* amber-gold, readable on dark */
+    --bull: #7ab67a;             /* muted leaf green, readable */
+    --bear: #e06868;             /* softened coral red */
+    --neutral: #a89d85;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'EB Garamond', 'Fraunces', Georgia, serif;
+    font-weight: 400;
+    font-size: 17px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: 0.005em;
+  }
+
+  body {
+    background-image:
+      radial-gradient(ellipse at 0% 0%, rgba(216, 90, 90, 0.06), transparent 55%),
+      radial-gradient(ellipse at 100% 100%, rgba(212, 168, 75, 0.05), transparent 55%);
+    /* subtle paper grain */
+    background-image:
+      radial-gradient(ellipse at 0% 0%, rgba(216, 90, 90, 0.06), transparent 55%),
+      radial-gradient(ellipse at 100% 100%, rgba(212, 168, 75, 0.05), transparent 55%),
+      radial-gradient(circle at 15% 35%, rgba(232, 223, 201, 0.015) 0.5px, transparent 1px),
+      radial-gradient(circle at 65% 75%, rgba(232, 223, 201, 0.015) 0.5px, transparent 1px);
+    background-size: auto, auto, 6px 6px, 9px 9px;
+  }
+
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 60px 48px 120px;
+  }
+
+  /* ───── Masthead ───── */
+  .masthead {
+    text-align: center;
+    padding-bottom: 44px;
+    margin-bottom: 56px;
+    border-bottom: 1px solid var(--rule);
+    position: relative;
+  }
+  .masthead::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    border-bottom: 1px solid var(--ink);
+  }
+  .masthead .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--ink-fade);
+    margin-bottom: 18px;
+  }
+  .masthead h1 {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(32px, 4.5vw, 54px);
+    line-height: 1.05;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+    margin-bottom: 12px;
+  }
+  .masthead h1 em {
+    font-style: normal;
+    font-weight: 300;
+  }
+  .masthead .subtitle {
+    font-family: 'EB Garamond', serif;
+    font-size: 19px;
+    font-style: italic;
+    color: var(--ink-mid);
+    max-width: 680px;
+    margin: 18px auto 0;
+    line-height: 1.4;
+  }
+  .masthead .plate-no {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ink-fade);
+    margin-top: 22px;
+  }
+
+  /* ───── Preface ───── */
+  .preface {
+    max-width: 720px;
+    margin: 0 auto 72px;
+    padding: 0 16px;
+    font-family: 'EB Garamond', serif;
+    font-size: 17px;
+    line-height: 1.65;
+    color: var(--ink);
+  }
+  .preface p { margin-bottom: 14px; }
+  .preface p:first-child::first-letter {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    font-size: 58px;
+    float: left;
+    line-height: 0.85;
+    padding: 4px 10px 0 0;
+    color: var(--accent);
+  }
+  .preface .sig {
+    text-align: right;
+    font-style: italic;
+    color: var(--ink-mid);
+    margin-top: 18px;
+    font-size: 15px;
+  }
+
+  /* ───── Section dividers ───── */
+  .section-break {
+    text-align: center;
+    margin: 72px 0 40px;
+    color: var(--ink-fade);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    position: relative;
+  }
+  .section-break::before,
+  .section-break::after {
+    content: '';
+    display: inline-block;
+    width: 60px;
+    border-top: 1px solid var(--rule);
+    vertical-align: middle;
+    margin: 0 14px;
+  }
+
+  /* ───── Pattern entry ───── */
+  .plate {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 36px;
+    padding: 36px 0 40px;
+    border-bottom: 1px solid var(--rule);
+    align-items: start;
+  }
+  .plate:last-child { border-bottom: none; }
+
+  .plate-meta {
+    position: sticky;
+    top: 24px;
+  }
+  .plate-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--ink-fade);
+    margin-bottom: 6px;
+  }
+  .plate-classif {
+    font-family: 'EB Garamond', serif;
+    font-size: 13px;
+    color: var(--ink-mid);
+    font-style: italic;
+    line-height: 1.45;
+    margin-bottom: 18px;
+  }
+  .plate-classif .bull { color: var(--bull); font-style: normal; font-weight: 500; }
+  .plate-classif .bear { color: var(--bear); font-style: normal; font-weight: 500; }
+  .plate-classif .neutral { color: var(--neutral); font-style: normal; font-weight: 500; }
+  .plate-classif .tag {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border: 1px solid var(--ink-mid);
+    color: var(--ink-mid);
+    font-style: normal;
+    margin-top: 6px;
+  }
+
+  .coord-ref {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--rule);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-mid);
+    letter-spacing: 0.08em;
+  }
+  .coord-ref .label {
+    color: var(--ink-fade);
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .coord-ref .quad {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--accent);
+    font-weight: 400;
+  }
+
+  .plate-main h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 400;
+    font-size: 34px;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .plate-main h2 em {
+    font-style: italic;
+    font-weight: 300;
+    color: var(--ink-mid);
+  }
+  .plate-main .kanji {
+    font-family: 'EB Garamond', serif;
+    font-style: italic;
+    font-size: 15px;
+    color: var(--ink-mid);
+    margin-bottom: 20px;
+  }
+
+  /* ───── Specimen row ───── */
+  .specimens {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin: 24px 0 28px;
+  }
+  .specimen {
+    border: 1px solid var(--rule);
+    background: var(--paper-raised);
+    padding: 22px 18px 18px;
+    position: relative;
+  }
+  .specimen-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: var(--ink-fade);
+    margin-bottom: 14px;
+    text-align: center;
+  }
+  .specimen-label .kind {
+    display: inline-block;
+    padding: 2px 8px;
+    border: 1px solid currentColor;
+    margin-right: 0;
+  }
+  .specimen-svg {
+    width: 100%;
+    height: 150px;
+    display: block;
+  }
+  .specimen-caption {
+    font-family: 'EB Garamond', serif;
+    font-style: italic;
+    font-size: 12px;
+    color: var(--ink-mid);
+    text-align: center;
+    margin-top: 10px;
+    line-height: 1.35;
+  }
+
+  /* ───── Description body ───── */
+  .description {
+    font-family: 'EB Garamond', serif;
+    font-size: 16px;
+    line-height: 1.65;
+    color: var(--ink);
+    max-width: 66ch;
+  }
+  .description p { margin-bottom: 12px; }
+  .description p:last-child { margin-bottom: 0; }
+
+  .distinction {
+    margin-top: 22px;
+    padding: 18px 22px;
+    background: rgba(212, 168, 75, 0.06);
+    border-left: 2px solid var(--gold);
+  }
+  .distinction h4 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 10px;
+    font-weight: 500;
+  }
+  .distinction p {
+    font-family: 'EB Garamond', serif;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--ink);
+    font-style: italic;
+  }
+  .distinction p strong {
+    color: var(--gold);
+    font-weight: 500;
+    font-style: normal;
+  }
+  .distinction p:not(:last-child) { margin-bottom: 10px; }
+
+  .cousin {
+    margin-top: 20px;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: 14px;
+    color: var(--ink-mid);
+    padding-top: 16px;
+    border-top: 1px dashed var(--rule);
+  }
+  .cousin .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--ink-fade);
+  }
+  .cousin .name {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 18px;
+    color: var(--accent);
+    font-weight: 400;
+  }
+  .cousin .arrow {
+    color: var(--ink-fade);
+    font-size: 12px;
+  }
+
+  /* ───── TOC ───── */
+  .toc {
+    max-width: 720px;
+    margin: 0 auto 72px;
+    padding: 32px 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .toc h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ink-fade);
+    text-align: center;
+    margin-bottom: 20px;
+    font-weight: 500;
+  }
+  .toc-group {
+    margin-bottom: 18px;
+  }
+  .toc-group:last-child { margin-bottom: 0; }
+  .toc-group-title {
+    font-family: 'EB Garamond', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: var(--ink-mid);
+    margin-bottom: 4px;
+    text-align: center;
+  }
+  .toc-entries {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px 18px;
+  }
+  .toc-entries a {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 16px;
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--ink-mid);
+    padding-bottom: 1px;
+    transition: color 150ms, border-color 150ms;
+  }
+  .toc-entries a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc-entries .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-fade);
+    margin-right: 4px;
+    font-style: normal;
+  }
+
+  /* ───── Glossary appendix ───── */
+  .appendix {
+    margin-top: 80px;
+    padding-top: 48px;
+    border-top: 2px solid var(--ink);
+  }
+  .appendix h3 {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 26px;
+    margin-bottom: 8px;
+  }
+  .appendix .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--ink-fade);
+    margin-bottom: 6px;
+  }
+  .appendix .body {
+    font-family: 'EB Garamond', serif;
+    font-size: 16px;
+    line-height: 1.65;
+    max-width: 70ch;
+    margin-top: 18px;
+  }
+  .appendix .body p { margin-bottom: 12px; }
+  .appendix .body p em { color: var(--accent); font-style: italic; }
+
+  .quadrant-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--rule);
+    margin: 24px 0;
+    border: 1px solid var(--rule);
+  }
+  .quad-cell {
+    background: var(--paper-raised);
+    padding: 18px 20px;
+  }
+  .quad-cell .quad-name {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 18px;
+    color: var(--accent);
+    margin-bottom: 2px;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     PART II — L2-Augmented Scenarios
+     Same plate structure as Part I with additional ghost-layer styling
+     ═══════════════════════════════════════════════════════════════ */
+
+  .part-break {
+    margin: 96px 0 48px;
+    text-align: center;
+    position: relative;
+    padding: 32px 0;
+  }
+  .part-break::before,
+  .part-break::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    border-top: 1px solid var(--rule-strong);
+  }
+  .part-break::before { top: 0; }
+  .part-break::after { bottom: 0; }
+  .part-break .kicker {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--ink-fade);
+    margin-bottom: 14px;
+    display: block;
+  }
+  .part-break h2 {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(26px, 3.5vw, 40px);
+    line-height: 1.1;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+    margin-bottom: 14px;
+  }
+  .part-break h2 em {
+    color: var(--accent);
+    font-style: italic;
+  }
+  .part-break .lede {
+    font-family: 'EB Garamond', serif;
+    font-style: italic;
+    font-size: 17px;
+    color: var(--ink-mid);
+    max-width: 620px;
+    margin: 0 auto;
+    line-height: 1.4;
+  }
+
+  /* ── Primer plate — explanatory rather than pattern-catalog ── */
+  .primer {
+    background: var(--paper-raised);
+    border: 1px solid var(--rule);
+    padding: 36px 40px;
+    margin: 40px 0 56px;
+    max-width: none;
+  }
+  .primer .primer-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+  .primer h3 {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 28px;
+    margin-bottom: 20px;
+    color: var(--ink);
+  }
+  .primer-body {
+    font-family: 'EB Garamond', serif;
+    font-size: 16px;
+    line-height: 1.65;
+    max-width: 70ch;
+  }
+  .primer-body p { margin-bottom: 14px; }
+  .primer-body em { color: var(--accent); font-style: italic; }
+  .primer-body strong { color: var(--gold); font-weight: 500; }
+
+  /* Two-column legend inside the primer */
+  .primer-legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 28px;
+    padding-top: 28px;
+    border-top: 1px dashed var(--rule);
+  }
+  .primer-legend .col {
+    padding: 0;
+  }
+  .primer-legend .col-title {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 19px;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .primer-legend .col-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-fade);
+    margin-bottom: 14px;
+  }
+  .primer-legend dl {
+    font-family: 'EB Garamond', serif;
+    font-size: 14.5px;
+    line-height: 1.5;
+  }
+  .primer-legend dt {
+    font-style: italic;
+    color: var(--ink);
+    margin-top: 8px;
+  }
+  .primer-legend dt:first-child { margin-top: 0; }
+  .primer-legend dd {
+    color: var(--ink-mid);
+    margin-left: 0;
+    font-size: 14px;
+  }
+
+  /* ── Coherence badge — new classification system for Part II ── */
+  .coherence-badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    margin-top: 8px;
+    border: 1px solid;
+    font-weight: 500;
+  }
+  .coherence-badge.coherent {
+    color: var(--bull);
+    border-color: var(--bull);
+    background: rgba(122, 182, 122, 0.08);
+  }
+  .coherence-badge.divergent {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(216, 90, 90, 0.08);
+  }
+  .coherence-badge.balanced {
+    color: var(--gold);
+    border-color: var(--gold);
+    background: rgba(212, 168, 75, 0.08);
+  }
+
+  /* ── Dual-layer specimen card for L2 plates ── */
+  .specimen-dual {
+    border: 1px solid var(--rule);
+    background: var(--paper-raised);
+    padding: 22px 18px 18px;
+    position: relative;
+  }
+  .specimen-dual .specimen-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.26em;
+    text-transform: uppercase;
+    color: var(--ink-fade);
+    margin-bottom: 14px;
+    text-align: center;
+  }
+  .specimen-dual-svg {
+    width: 100%;
+    height: 170px;
+    display: block;
+  }
+  .dual-legend {
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    margin-top: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--ink-fade);
+    letter-spacing: 0.1em;
+  }
+  .dual-legend .lg-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dual-legend .swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 1px solid currentColor;
+  }
+  .dual-legend .swatch.ghost {
+    opacity: 0.5;
+  }
+
+  /* ── Reading table: how to interpret price vs ghost ── */
+  .reading-table {
+    margin-top: 22px;
+    border: 1px solid var(--rule);
+  }
+  .reading-table .row {
+    display: grid;
+    grid-template-columns: 140px 1fr 1fr;
+    border-top: 1px solid var(--rule);
+    font-family: 'EB Garamond', serif;
+    font-size: 14px;
+  }
+  .reading-table .row:first-child { border-top: none; }
+  .reading-table .row .key {
+    padding: 14px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--gold);
+    background: rgba(212, 168, 75, 0.04);
+    border-right: 1px solid var(--rule);
+  }
+  .reading-table .row .value {
+    padding: 14px 18px;
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .reading-table .row .value.price-view { border-right: 1px solid var(--rule); }
+  .reading-table .row .value em { color: var(--ink-mid); font-style: italic; }
+
+  /* ── Scenario grid — compact 2-col layout for supplementary scenarios ── */
+  .scenario-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin: 32px 0;
+  }
+  @media (max-width: 780px) {
+    .scenario-grid { grid-template-columns: 1fr; }
+    .reading-table .row { grid-template-columns: 1fr; }
+    .reading-table .row .key { border-right: none; border-bottom: 1px solid var(--rule); }
+    .reading-table .row .value.price-view { border-right: none; border-bottom: 1px dashed var(--rule); }
+    .primer-legend { grid-template-columns: 1fr; }
+    .primer { padding: 24px 22px; }
+  }
+  .scenario-card {
+    background: var(--paper-raised);
+    border: 1px solid var(--rule);
+    padding: 22px 24px 24px;
+  }
+  .scenario-card .sc-coord {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--ink-fade);
+    margin-bottom: 4px;
+  }
+  .scenario-card h4 {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 22px;
+    color: var(--ink);
+    margin-bottom: 4px;
+    line-height: 1.1;
+  }
+  .scenario-card .sc-sub {
+    font-family: 'EB Garamond', serif;
+    font-size: 13px;
+    color: var(--accent);
+    font-style: italic;
+    margin-bottom: 14px;
+  }
+  .scenario-card .sc-svg-wrap {
+    background: rgba(20, 17, 13, 0.5);
+    border: 1px solid var(--rule);
+    padding: 10px;
+    margin-bottom: 12px;
+  }
+  .scenario-card .sc-svg {
+    width: 100%;
+    height: 110px;
+    display: block;
+  }
+  .scenario-card .sc-desc {
+    font-family: 'EB Garamond', serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink);
+  }
+  .scenario-card .sc-desc em { color: var(--ink-mid); font-style: italic; }
+
+  /* Original quad-cell rules continue below, duplicated only for override safety */
+  .quadrant-grid-ghost {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--rule);
+    margin: 24px 0;
+    border: 1px solid var(--rule);
+  }
+  .quad-cell .quad-loc {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-fade);
+    margin-bottom: 6px;
+  }
+  .quad-cell .quad-desc {
+    font-family: 'EB Garamond', serif;
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.45;
+  }
+
+  footer {
+    margin-top: 80px;
+    padding-top: 32px;
+    border-top: 1px solid var(--rule);
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-fade);
+  }
+  footer em {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 12px;
+    letter-spacing: 0;
+    color: var(--ink-mid);
+    text-transform: none;
+    display: block;
+    margin-top: 8px;
+  }
+
+  /* ───── Responsive ───── */
+  @media (max-width: 780px) {
+    .page { padding: 40px 20px 80px; }
+    .plate { grid-template-columns: 1fr; gap: 18px; }
+    .plate-meta { position: static; }
+    .specimens { grid-template-columns: 1fr; }
+    .masthead h1 { font-size: 32px; }
+    .plate-main h2 { font-size: 26px; }
+  }
+
+  /* ───── Smooth scroll ───── */
+  html { scroll-behavior: smooth; scroll-padding-top: 20px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- MASTHEAD -->
+  <header class="masthead">
+    <div class="eyebrow">A Companion Reference · ℓ</div>
+    <h1>A Catalog of <em>Candlestick Reversal Patterns</em><br>with Volume &amp; L2-Ghost Counterparts</h1>
+    <div class="subtitle">
+      Part I: Fifteen canonical forms from the Japanese tradition, each paired with its volume-weighted
+      analogue. Part II: The L2-ghost overlay &mdash; how the order-book state beneath the candle
+      reveals a layer of conviction no traditional pattern can see.
+    </div>
+    <div class="plate-no">Plates I &mdash; XV · Scenarios A &mdash; K</div>
+  </header>
+
+  <!-- PREFACE -->
+  <section class="preface">
+    <p>The candlestick patterns codified by Sakata and brought into the Western canon by Steve Nison
+    presume a chart in which every bar is drawn to the same width. They are a taxonomy of
+    <em>body and wick geometry</em> &mdash; a vocabulary developed before the widespread visual integration
+    of volume into the candle itself. This catalog places each canonical pattern beside its
+    volume-weighted counterpart, in which the candle's width is proportional to its relative volume.</p>
+    <p>The aim is not to displace the traditional vocabulary but to annotate it. In most cases, the
+    volume dimension <em>refines</em> a signal the traditional pattern already points toward. In a
+    few cases, it produces a meaningful subdivision &mdash; a single name in the Japanese canon splitting
+    into several behaviorally distinct events.</p>
+    <p>Each entry notes its closest cousin in the volume-weighted coordinate system (the matrix of
+    Effort &times; Result) that this reference is a companion to. The two vocabularies are complementary,
+    not competing.</p>
+    <p class="sig">&mdash; A reference for study</p>
+  </section>
+
+  <!-- TOC -->
+  <nav class="toc">
+    <h3>Contents</h3>
+
+    <div class="toc-group">
+      <div class="toc-group-title">Part I &middot; Canonical Patterns &amp; Volume Variants</div>
+    </div>
+
+    <div class="toc-group">
+      <div class="toc-group-title">Single-Bar Patterns</div>
+      <div class="toc-entries">
+        <a href="#p1"><span class="num">I.</span> Hammer</a>
+        <a href="#p2"><span class="num">II.</span> Hanging Man</a>
+        <a href="#p3"><span class="num">III.</span> Shooting Star</a>
+        <a href="#p4"><span class="num">IV.</span> Inverted Hammer</a>
+        <a href="#p5"><span class="num">V.</span> Doji</a>
+        <a href="#p6"><span class="num">VI.</span> Gravestone &amp; Dragonfly</a>
+        <a href="#p7"><span class="num">VII.</span> Marubozu</a>
+      </div>
+    </div>
+
+    <div class="toc-group">
+      <div class="toc-group-title">Two-Bar Patterns</div>
+      <div class="toc-entries">
+        <a href="#p8"><span class="num">VIII.</span> Bullish Engulfing</a>
+        <a href="#p9"><span class="num">IX.</span> Bearish Engulfing</a>
+        <a href="#p10"><span class="num">X.</span> Piercing Line</a>
+        <a href="#p11"><span class="num">XI.</span> Dark Cloud Cover</a>
+        <a href="#p12"><span class="num">XII.</span> Harami</a>
+        <a href="#p13"><span class="num">XIII.</span> Tweezers</a>
+      </div>
+    </div>
+
+    <div class="toc-group">
+      <div class="toc-group-title">Three-Bar Patterns</div>
+      <div class="toc-entries">
+        <a href="#p14"><span class="num">XIV.</span> Morning &amp; Evening Star</a>
+        <a href="#p15"><span class="num">XV.</span> Three White Soldiers &amp; Three Black Crows</a>
+      </div>
+    </div>
+
+    <div class="toc-group" style="margin-top: 28px; padding-top: 16px; border-top: 1px dashed var(--rule);">
+      <div class="toc-group-title">Part II &middot; L2-Ghost Scenarios</div>
+    </div>
+
+    <div class="toc-group">
+      <div class="toc-group-title">Primer</div>
+      <div class="toc-entries">
+        <a href="#primer"><span class="num">P.</span> How to Read a Ghost Candle</a>
+      </div>
+    </div>
+
+    <div class="toc-group">
+      <div class="toc-group-title">Key Scenarios</div>
+      <div class="toc-entries">
+        <a href="#sA"><span class="num">A.</span> The Engine</a>
+        <a href="#sB"><span class="num">B.</span> The Slip</a>
+        <a href="#sC"><span class="num">C.</span> Coherence</a>
+        <a href="#sD"><span class="num">D.</span> Hidden Floor</a>
+      </div>
+    </div>
+
+    <div class="toc-group">
+      <div class="toc-group-title">Supplementary Scenarios</div>
+      <div class="toc-entries">
+        <a href="#sE"><span class="num">E.</span> Flash Crash</a>
+        <a href="#sF"><span class="num">F.</span> Institutional Buy</a>
+        <a href="#sG"><span class="num">G.</span> Wall Build</a>
+        <a href="#sH"><span class="num">H.</span> Ghost Divergence</a>
+        <a href="#sI"><span class="num">I.</span> Silent Buyer</a>
+        <a href="#sJ"><span class="num">J.</span> Bull Climax</a>
+        <a href="#sK"><span class="num">K.</span> Exhaustion Spike</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="section-break">Single-Bar Patterns</div>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- I. HAMMER -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="p1">
+    <div class="plate-meta">
+      <div class="plate-number">Plate I</div>
+      <div class="plate-classif">
+        <span class="bull">Bullish</span> Reversal<br>
+        Single-bar<br>
+        <span class="tag">Umbrella Line</span>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q4 Wall</span><br>
+        <span style="font-size:10px;color:var(--ink-mid)">at a prior low</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>The Hammer <em>— Takuri</em></h2>
+      <div class="kanji">&ldquo;Probing the depths with the foot&rdquo;</div>
+
+      <div class="specimens">
+        <div class="specimen">
+          <div class="specimen-label">Canonical · Equal-Width</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <!-- downtrend context bars, thin grey -->
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="12" y1="30" x2="12" y2="75"/>
+              <rect x="8" y="40" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="30" y1="45" x2="30" y2="92"/>
+              <rect x="26" y="60" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="48" y1="65" x2="48" y2="110"/>
+              <rect x="44" y="82" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- The hammer -->
+            <line x1="72" y1="100" x2="72" y2="140" stroke="#7ab67a" stroke-width="1.2"/>
+            <line x1="72" y1="95" x2="72" y2="105" stroke="#7ab67a" stroke-width="1.2"/>
+            <rect x="66" y="95" width="12" height="12" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1.2"/>
+            <!-- annotation -->
+            <text x="72" y="20" text-anchor="middle" font-family="JetBrains Mono" font-size="8" fill="#6b6253" letter-spacing="0.1em">↓</text>
+          </svg>
+          <div class="specimen-caption">Small body at the top, long lower shadow twice the body length</div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">Volume-Weighted</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="12" y1="30" x2="12" y2="75"/>
+              <rect x="8" y="40" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="30" y1="45" x2="30" y2="92"/>
+              <rect x="26" y="60" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="48" y1="65" x2="48" y2="110"/>
+              <rect x="44" y="82" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Volume-weighted hammer: WIDE body, still small, long shadow -->
+            <line x1="78" y1="100" x2="78" y2="140" stroke="#7ab67a" stroke-width="1.2"/>
+            <line x1="78" y1="95" x2="78" y2="105" stroke="#7ab67a" stroke-width="1.2"/>
+            <rect x="62" y="95" width="32" height="12" fill="#7ab67a" fill-opacity="0.22" stroke="#7ab67a" stroke-width="1.2"/>
+          </svg>
+          <div class="specimen-caption">The <em>authentic</em> hammer: the small body carries heavy volume &mdash; sellers pushed, but were absorbed</div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>A classic bullish reversal at the end of a downtrend. Price opens, is driven down to a new low by
+        sellers, then recovers strongly to close near the open. Nison emphasizes three conditions: a small real
+        body near the top of the range, a lower shadow at least twice the body's length, and little or no upper
+        shadow. The body color is secondary, though a white (bullish) body is marginally stronger.</p>
+        <p>The psychology is one of failed capitulation &mdash; a final flush that found buyers waiting beneath.</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Width Adds</h4>
+        <p>A hammer with <strong>wide volume</strong> is a hammer in the fullest sense &mdash; visible effort was expended
+        to drive price down, and that effort was absorbed. This is the textbook reversal.</p>
+        <p>A hammer with <strong>narrow volume</strong> &mdash; identical body-and-wick geometry but anemic participation
+        &mdash; is a different animal. It may be a liquidity gap low rather than genuine absorption. Treat as a
+        weak signal requiring confirmation.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Matrix Vector</span>
+        <span class="name">Q4 → Q2 (Rebound)</span>
+        <span class="arrow">when followed by a wide-body green bar</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- II. HANGING MAN -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="p2">
+    <div class="plate-meta">
+      <div class="plate-number">Plate II</div>
+      <div class="plate-classif">
+        <span class="bear">Bearish</span> Reversal<br>
+        Single-bar<br>
+        <span class="tag">Umbrella Line</span>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q4 Wall</span><br>
+        <span style="font-size:10px;color:var(--ink-mid)">at a prior high</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>The Hanging Man</h2>
+      <div class="kanji">&ldquo;The gallows at the peak&rdquo;</div>
+
+      <div class="specimens">
+        <div class="specimen">
+          <div class="specimen-label">Canonical · Equal-Width</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="12" y1="90" x2="12" y2="130"/>
+              <rect x="8" y="95" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="30" y1="70" x2="30" y2="115"/>
+              <rect x="26" y="80" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="48" y1="50" x2="48" y2="92"/>
+              <rect x="44" y="55" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- The hanging man: same geometry as hammer but at top -->
+            <line x1="72" y1="20" x2="72" y2="60" stroke="#e06868" stroke-width="1.2"/>
+            <line x1="72" y1="18" x2="72" y2="25" stroke="#e06868" stroke-width="1.2"/>
+            <rect x="66" y="18" width="12" height="10" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1.2"/>
+          </svg>
+          <div class="specimen-caption">Geometrically identical to the hammer &mdash; small body, long lower shadow &mdash; but appearing at a peak</div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">Volume-Weighted</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="12" y1="90" x2="12" y2="130"/>
+              <rect x="8" y="95" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="30" y1="70" x2="30" y2="115"/>
+              <rect x="26" y="80" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="48" y1="50" x2="48" y2="92"/>
+              <rect x="44" y="55" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Wide body -->
+            <line x1="78" y1="20" x2="78" y2="60" stroke="#e06868" stroke-width="1.2"/>
+            <line x1="78" y1="18" x2="78" y2="25" stroke="#e06868" stroke-width="1.2"/>
+            <rect x="62" y="18" width="32" height="10" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1.2"/>
+          </svg>
+          <div class="specimen-caption">Heavy volume with a small body at the peak &mdash; distribution at resistance</div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>The hanging man has the same anatomy as the hammer but appears after an uptrend. The market rallied, was then pushed down sharply, and recovered &mdash; but the very fact that sellers could drive price that far below the open signals that the buying has weakened. Nison is careful: this pattern requires bearish confirmation on the following bar.</p>
+        <p>Without confirmation it is simply an ambiguous candle at a peak. The body color matters less than the length of the lower shadow relative to the body.</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Width Adds</h4>
+        <p>A wide hanging man is the telling version &mdash; the heavy volume means sellers genuinely appeared and made a visible incursion, even if buyers recovered the day. That is exactly the early-distribution pattern traders are watching for.</p>
+        <p>A narrow hanging man, by contrast, may simply be low-conviction drift at the top of a range. It is more often noise than signal.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Matrix Vector</span>
+        <span class="name">Q2 → Q4 (Climax)</span>
+        <span class="arrow">when the next bar delivers confirmation</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- III. SHOOTING STAR -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="p3">
+    <div class="plate-meta">
+      <div class="plate-number">Plate III</div>
+      <div class="plate-classif">
+        <span class="bear">Bearish</span> Reversal<br>
+        Single-bar<br>
+        <span class="tag">Star</span>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q1 Vacuum</span><br>
+        <span style="font-size:10px;color:var(--ink-mid)">reversal variant</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>The Shooting Star</h2>
+      <div class="kanji">&ldquo;A rejected ascent&rdquo;</div>
+
+      <div class="specimens">
+        <div class="specimen">
+          <div class="specimen-label">Canonical · Equal-Width</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="12" y1="100" x2="12" y2="140"/>
+              <rect x="8" y="108" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="30" y1="85" x2="30" y2="125"/>
+              <rect x="26" y="92" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="48" y1="70" x2="48" y2="110"/>
+              <rect x="44" y="75" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Shooting star: small body at bottom, long upper shadow -->
+            <line x1="72" y1="20" x2="72" y2="80" stroke="#e06868" stroke-width="1.2"/>
+            <line x1="72" y1="78" x2="72" y2="88" stroke="#e06868" stroke-width="1.2"/>
+            <rect x="66" y="78" width="12" height="10" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1.2"/>
+          </svg>
+          <div class="specimen-caption">Small body near the low, long upper shadow at least twice the body length</div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">Volume-Weighted</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="12" y1="100" x2="12" y2="140"/>
+              <rect x="8" y="108" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="30" y1="85" x2="30" y2="125"/>
+              <rect x="26" y="92" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="48" y1="70" x2="48" y2="110"/>
+              <rect x="44" y="75" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Wide body version -->
+            <line x1="78" y1="20" x2="78" y2="80" stroke="#e06868" stroke-width="1.2"/>
+            <line x1="78" y1="78" x2="78" y2="88" stroke="#e06868" stroke-width="1.2"/>
+            <rect x="62" y="78" width="32" height="10" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1.2"/>
+          </svg>
+          <div class="specimen-caption">Wide body with long upper shadow &mdash; price was pushed up on real volume and rejected</div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>Price opens, rallies strongly, and then falls back to close near the open. The upper shadow marks the territory that sellers reclaimed. In Nison's framework the pattern requires a gap up from the prior body for full significance, though in practice traders accept gapless variants.</p>
+        <p>The shooting star is psychologically one of the clearest: the bulls reached for the stars and were rejected. What matters is not that price tried, but that it failed.</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Width Adds</h4>
+        <p>A wide shooting star tells you the rally was attempted <em>with full conviction</em> and still got rejected. That is a markedly stronger signal than the same geometry on thin volume, which may simply be the top of an illiquid rally.</p>
+        <p>Shooting stars on anemic volume often fall into the Vacuum quadrant &mdash; price traveled but no one participated. These patterns tend to mean-revert without needing the classic bearish confirmation.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Matrix Vector</span>
+        <span class="name">Q1 → Q3 (Fade) or Q2 → Q4 (Climax)</span>
+        <span class="arrow">depending on volume character</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- IV. INVERTED HAMMER -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="p4">
+    <div class="plate-meta">
+      <div class="plate-number">Plate IV</div>
+      <div class="plate-classif">
+        <span class="bull">Bullish</span> Reversal<br>
+        Single-bar<br>
+        <span class="tag">Star</span>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q1 Vacuum</span><br>
+        <span style="font-size:10px;color:var(--ink-mid)">at a prior low</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>The Inverted Hammer</h2>
+      <div class="kanji">&ldquo;A first attempt, rejected&rdquo;</div>
+
+      <div class="specimens">
+        <div class="specimen">
+          <div class="specimen-label">Canonical · Equal-Width</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="12" y1="30" x2="12" y2="75"/>
+              <rect x="8" y="40" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="30" y1="45" x2="30" y2="92"/>
+              <rect x="26" y="60" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="48" y1="65" x2="48" y2="110"/>
+              <rect x="44" y="82" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Inverted hammer: same as shooting star geometrically, but at a low -->
+            <line x1="72" y1="60" x2="72" y2="120" stroke="#7ab67a" stroke-width="1.2"/>
+            <line x1="72" y1="118" x2="72" y2="128" stroke="#7ab67a" stroke-width="1.2"/>
+            <rect x="66" y="118" width="12" height="10" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1.2"/>
+          </svg>
+          <div class="specimen-caption">Same anatomy as shooting star but appearing at a trough</div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">Volume-Weighted</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="12" y1="30" x2="12" y2="75"/>
+              <rect x="8" y="40" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="30" y1="45" x2="30" y2="92"/>
+              <rect x="26" y="60" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="48" y1="65" x2="48" y2="110"/>
+              <rect x="44" y="82" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <line x1="78" y1="60" x2="78" y2="120" stroke="#7ab67a" stroke-width="1.2"/>
+            <line x1="78" y1="118" x2="78" y2="128" stroke="#7ab67a" stroke-width="1.2"/>
+            <rect x="62" y="118" width="32" height="10" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1.2"/>
+          </svg>
+          <div class="specimen-caption">The wide version implies a real test of higher prices was made &mdash; buyers showed up once</div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>A cousin of the shooting star, differentiated only by its position in a downtrend rather than an uptrend. The inverted hammer shows that buyers made a probing attempt to rally before being pushed back. It is a softer signal than the hammer proper &mdash; Nison requires strong bullish confirmation the next day.</p>
+        <p>Think of it as a first skirmish. The bulls have announced their presence, but they have not yet won.</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Width Adds</h4>
+        <p>Volume makes the inverted hammer far more legible. A wide inverted hammer signals that buyers mustered genuine participation in their attempted rally &mdash; the fact that sellers beat it back is bearish, but the presence of real buying is the reversal seed.</p>
+        <p>A narrow inverted hammer is often ambiguous enough to dismiss.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Matrix Vector</span>
+        <span class="name">Q1 → Q2 (Confirmation)</span>
+        <span class="arrow">the subsequent bar validates the probe</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- V. DOJI -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="p5">
+    <div class="plate-meta">
+      <div class="plate-number">Plate V</div>
+      <div class="plate-classif">
+        <span class="neutral">Indecision</span><br>
+        Single-bar<br>
+        <span class="tag">Doji</span>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q3 Apathy</span><br>
+        <span style="font-size:10px;color:var(--ink-mid)">or Q4 if high-vol</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>The Doji <em>— Dōji</em></h2>
+      <div class="kanji">&ldquo;A mistake, or: simultaneous&rdquo;</div>
+
+      <div class="specimens">
+        <div class="specimen">
+          <div class="specimen-label">Canonical · Equal-Width</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="18" y1="40" x2="18" y2="85"/>
+              <rect x="14" y="48" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="40" y1="55" x2="40" y2="100"/>
+              <rect x="36" y="65" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Classic doji: long upper and lower shadow, no body (just a line) -->
+            <line x1="70" y1="30" x2="70" y2="115" stroke="#d4a84b" stroke-width="1.2"/>
+            <line x1="62" y1="72" x2="78" y2="72" stroke="#d4a84b" stroke-width="1.8"/>
+            <!-- Another doji variant -->
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="100" y1="50" x2="100" y2="95"/>
+              <rect x="96" y="60" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+          </svg>
+          <div class="specimen-caption">Open equals close (or nearly so). The body is a horizontal line. Upper and lower shadows may be long or short.</div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">Volume-Weighted</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="18" y1="40" x2="18" y2="85"/>
+              <rect x="14" y="48" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="40" y1="55" x2="40" y2="100"/>
+              <rect x="36" y="65" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Wide doji: heavy volume, no price progress = the Squat -->
+            <line x1="75" y1="30" x2="75" y2="115" stroke="#d4a84b" stroke-width="1.2"/>
+            <line x1="55" y1="72" x2="95" y2="72" stroke="#d4a84b" stroke-width="2.2"/>
+            <text x="75" y="140" text-anchor="middle" font-family="EB Garamond" font-style="italic" font-size="10" fill="#6b6253">heavy volume, no progress</text>
+          </svg>
+          <div class="specimen-caption">The <em>wide doji</em> is the Wyckoff &ldquo;squat&rdquo; &mdash; equal effort from both sides, a profound balance</div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>Open and close occur at effectively the same price. The doji is the most explicit single-bar signal of indecision in the Japanese canon. Its significance depends entirely on context: a doji after a strong trend is a warning; a doji in a range is noise.</p>
+        <p>Nison treats the doji less as a pattern and more as a modifier &mdash; a doji inside a larger multi-bar pattern often amplifies that pattern's significance (e.g., the Morning Doji Star).</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Width Adds</h4>
+        <p>The volume-weighted dimension <em>splits the doji into two fundamentally different events</em>:</p>
+        <p><strong>The narrow doji</strong> is disinterest. Neither side committed. This is the Apathy quadrant proper &mdash; a coiled spring, possibly.</p>
+        <p><strong>The wide doji</strong> is <em>perfect battle</em>. Both sides brought their full weight and reached a dead draw. This is the Wall quadrant. Wide dojis after strong trends are among the most reliable reversal signatures in the entire taxonomy &mdash; more reliable, arguably, than most named multi-bar patterns.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Matrix Cousins</span>
+        <span class="name">Q3 Apathy (narrow) · Q4 Wall (wide)</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- VI. GRAVESTONE & DRAGONFLY -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="p6">
+    <div class="plate-meta">
+      <div class="plate-number">Plate VI</div>
+      <div class="plate-classif">
+        <span class="bear">Bearish</span> / <span class="bull">Bullish</span><br>
+        Single-bar<br>
+        <span class="tag">Doji Variant</span>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q1 Vacuum · Q4 Wall</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>Gravestone &amp; Dragonfly Doji</h2>
+      <div class="kanji">&ldquo;Tōba&rdquo; &middot; &ldquo;Tonbo&rdquo;</div>
+
+      <div class="specimens">
+        <div class="specimen">
+          <div class="specimen-label">Canonical · Gravestone</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="20" y1="100" x2="20" y2="140"/>
+              <rect x="16" y="108" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="40" y1="80" x2="40" y2="120"/>
+              <rect x="36" y="88" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="60" y1="50" x2="60" y2="90"/>
+              <rect x="56" y="55" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Gravestone: line at bottom, long upper shadow -->
+            <line x1="85" y1="25" x2="85" y2="100" stroke="#e06868" stroke-width="1.5"/>
+            <line x1="77" y1="100" x2="93" y2="100" stroke="#e06868" stroke-width="2"/>
+          </svg>
+          <div class="specimen-caption">Open = low = close. Long upper shadow. A tombstone silhouette.</div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">Canonical · Dragonfly</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="20" y1="30" x2="20" y2="75"/>
+              <rect x="16" y="40" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="40" y1="45" x2="40" y2="90"/>
+              <rect x="36" y="55" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="60" y1="65" x2="60" y2="105"/>
+              <rect x="56" y="72" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Dragonfly: line at top, long lower shadow -->
+            <line x1="85" y1="40" x2="85" y2="120" stroke="#7ab67a" stroke-width="1.5"/>
+            <line x1="77" y1="40" x2="93" y2="40" stroke="#7ab67a" stroke-width="2"/>
+          </svg>
+          <div class="specimen-caption">Open = high = close. Long lower shadow. An insect at rest.</div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>Special dojis in which one of the shadows is effectively zero. The gravestone &mdash; open, low, and close all at the day's low &mdash; forms at peaks and is a strong bearish signal; the bulls pushed up all day, achieved nothing, and closed back at the starting point. The dragonfly is the mirror image at troughs.</p>
+        <p>Both are among the most visually unambiguous candles in the canon.</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Width Adds</h4>
+        <p>Width turns these from curious single-bar signals into high-conviction events. A wide gravestone is a perfect expression of absorption at resistance: heavy volume, maximum attempted range, zero net result &mdash; the canonical Wall.</p>
+        <p>A narrow gravestone often represents a low-liquidity false probe and is less reliable. The shape is less informative than the shape + volume together.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Matrix Cousins</span>
+        <span class="name">Wide Gravestone → Q4 Wall · Wide Dragonfly → Q4 Wall (inverted)</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- VII. MARUBOZU -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="p7">
+    <div class="plate-meta">
+      <div class="plate-number">Plate VII</div>
+      <div class="plate-classif">
+        <span class="bull">Bullish</span> / <span class="bear">Bearish</span> Continuation<br>
+        Single-bar<br>
+        <span class="tag">Belt-Hold</span>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q2 Engine</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>The Marubozu <em>— Marubōzu</em></h2>
+      <div class="kanji">&ldquo;Shaven head, no shadow&rdquo;</div>
+
+      <div class="specimens">
+        <div class="specimen">
+          <div class="specimen-label">Canonical · Equal-Width</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="18" y1="80" x2="18" y2="120"/>
+              <rect x="14" y="90" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="38" y1="70" x2="38" y2="115"/>
+              <rect x="34" y="80" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Marubozu: tall body, NO shadows -->
+            <rect x="62" y="30" width="16" height="80" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1.5"/>
+          </svg>
+          <div class="specimen-caption">No upper or lower shadow &mdash; open at the low, close at the high</div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">Volume-Weighted</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="18" y1="80" x2="18" y2="120"/>
+              <rect x="14" y="90" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="38" y1="70" x2="38" y2="115"/>
+              <rect x="34" y="80" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Wide marubozu = Engine -->
+            <rect x="54" y="30" width="36" height="80" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1.5"/>
+          </svg>
+          <div class="specimen-caption">Wide + tall = Arms' <em>power box</em>, Wyckoff's perfect conviction</div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>A candle with a full-length body and no shadows at all. The market opened, moved decisively in one direction for the entire session, and closed at the extreme. The Marubozu is the purest expression of one-sided conviction in the canon.</p>
+        <p>When one appears after a consolidation, it often signals the breakout direction. Multiple consecutive Marubozu bars constitute Three White Soldiers or Three Black Crows (Plate XV).</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Width Adds</h4>
+        <p>A wide Marubozu is the matrix's Engine quadrant made flesh &mdash; maximum result achieved through maximum effort, without any contest. This is Arms' "power box" and is the single most reliable momentum signature across all candle forms.</p>
+        <p>A narrow Marubozu is rarer and more suspicious: full-range directional movement on light volume suggests a liquidity gap (Vacuum), not genuine conviction. Watch for snap-back.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Matrix Cousins</span>
+        <span class="name">Wide → Q2 Engine · Narrow → Q1 Vacuum</span>
+      </div>
+    </div>
+  </article>
+
+  <div class="section-break">Two-Bar Patterns</div>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- VIII. BULLISH ENGULFING -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="p8">
+    <div class="plate-meta">
+      <div class="plate-number">Plate VIII</div>
+      <div class="plate-classif">
+        <span class="bull">Bullish</span> Reversal<br>
+        Two-bar<br>
+        <span class="tag">Engulfing</span>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q3 → Q2</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>Bullish Engulfing</h2>
+      <div class="kanji">&ldquo;Tsutsumi ashi&rdquo; &mdash; &ldquo;the wrapped leg&rdquo;</div>
+
+      <div class="specimens">
+        <div class="specimen">
+          <div class="specimen-label">Canonical · Equal-Width</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="14" y1="30" x2="14" y2="75"/>
+              <rect x="10" y="40" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="32" y1="45" x2="32" y2="92"/>
+              <rect x="28" y="60" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Small red -->
+            <line x1="58" y1="65" x2="58" y2="110"/>
+            <rect x="53" y="75" width="10" height="25" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1"/>
+            <!-- Large green engulfing -->
+            <line x1="82" y1="55" x2="82" y2="118"/>
+            <rect x="74" y="68" width="16" height="45" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1.5"/>
+          </svg>
+          <div class="specimen-caption">A small bearish candle followed by a large bullish candle whose body fully covers the prior</div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">Volume-Weighted</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="14" y1="30" x2="14" y2="75"/>
+              <rect x="10" y="40" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="32" y1="45" x2="32" y2="92"/>
+              <rect x="28" y="60" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Narrow red (low volume selling exhausted) -->
+            <line x1="58" y1="65" x2="58" y2="110"/>
+            <rect x="54" y="75" width="8" height="25" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1"/>
+            <!-- Wide green engulfing (conviction) -->
+            <line x1="85" y1="55" x2="85" y2="118"/>
+            <rect x="70" y="68" width="30" height="45" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1.5"/>
+          </svg>
+          <div class="specimen-caption">The <em>authentic</em> engulfing: thin-volume sell capitulates; heavy-volume buy confirms</div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>A small bearish candle inside a downtrend is followed by a bullish candle whose real body completely engulfs the prior body. The longer the engulfing candle relative to the engulfed, the more significant. Nison considers this one of the most reliable reversal signals.</p>
+        <p>The psychology is a sudden shift in control: the bears' weak offering is met with an overwhelming bullish response.</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Width Adds</h4>
+        <p>This is where the volume dimension is most diagnostic. The classic engulfing pattern splits cleanly into three distinct events:</p>
+        <p><strong>Narrow-red engulfed by wide-green</strong> &mdash; The textbook case. The selling was weak, the buying is strong. This is the reversal in its purest form.</p>
+        <p><strong>Wide-red engulfed by wide-green</strong> &mdash; A true battle. The bears showed up but the bulls overwhelmed them. Strongest variant; often marks a decisive swing low.</p>
+        <p><strong>Wide-red engulfed by narrow-green</strong> &mdash; A geometric engulfing that is substantively a trap. The bulls barely participated. Fails frequently.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Matrix Vector</span>
+        <span class="name">Q3 → Q2 (Ignition)</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- IX. BEARISH ENGULFING -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="p9">
+    <div class="plate-meta">
+      <div class="plate-number">Plate IX</div>
+      <div class="plate-classif">
+        <span class="bear">Bearish</span> Reversal<br>
+        Two-bar<br>
+        <span class="tag">Engulfing</span>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q2 → Q4</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>Bearish Engulfing</h2>
+      <div class="kanji">Mirror of the bullish engulfing</div>
+
+      <div class="specimens">
+        <div class="specimen">
+          <div class="specimen-label">Canonical · Equal-Width</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="14" y1="100" x2="14" y2="140"/>
+              <rect x="10" y="108" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="32" y1="75" x2="32" y2="120"/>
+              <rect x="28" y="85" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <line x1="58" y1="40" x2="58" y2="85"/>
+            <rect x="53" y="50" width="10" height="25" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1"/>
+            <line x1="82" y1="30" x2="82" y2="95"/>
+            <rect x="74" y="40" width="16" height="45" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1.5"/>
+          </svg>
+          <div class="specimen-caption">A small bullish candle engulfed by a large bearish candle</div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">Volume-Weighted</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="14" y1="100" x2="14" y2="140"/>
+              <rect x="10" y="108" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="32" y1="75" x2="32" y2="120"/>
+              <rect x="28" y="85" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <line x1="58" y1="40" x2="58" y2="85"/>
+            <rect x="54" y="50" width="8" height="25" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1"/>
+            <line x1="85" y1="30" x2="85" y2="95"/>
+            <rect x="70" y="40" width="30" height="45" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1.5"/>
+          </svg>
+          <div class="specimen-caption">Thin-volume buying exhausts; heavy-volume selling takes control</div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>At the top of an uptrend, a small bullish candle is followed by a bearish candle whose body fully engulfs the prior. This is one of the most reliable bearish reversal signals in the canon. Like its bullish counterpart, it benefits from gaps and extended prior trends.</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Width Adds</h4>
+        <p>The same three variants apply as with bullish engulfing. The strongest case is a narrow-green bar (fading buying) engulfed by a wide-red bar (decisive selling). A narrow-red engulfing a wide-green bar looks structurally dramatic but is often a liquidity-gap reversal that fails to follow through.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Matrix Vector</span>
+        <span class="name">Q2 → Q4 (Climax) or Q2 → Q2-bear</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- X. PIERCING LINE -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="p10">
+    <div class="plate-meta">
+      <div class="plate-number">Plate X</div>
+      <div class="plate-classif">
+        <span class="bull">Bullish</span> Reversal<br>
+        Two-bar<br>
+        <span class="tag">Piercing</span>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q4 → Q2</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>The Piercing Line <em>— Kirikomi</em></h2>
+      <div class="kanji">&ldquo;A cutting into&rdquo;</div>
+
+      <div class="specimens">
+        <div class="specimen">
+          <div class="specimen-label">Canonical · Equal-Width</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="14" y1="30" x2="14" y2="70"/>
+              <rect x="10" y="35" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="32" y1="45" x2="32" y2="85"/>
+              <rect x="28" y="50" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- First: long red bar -->
+            <line x1="58" y1="55" x2="58" y2="120"/>
+            <rect x="51" y="60" width="14" height="55" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1"/>
+            <!-- Second: green bar opening lower, piercing > midway -->
+            <line x1="82" y1="70" x2="82" y2="125"/>
+            <rect x="75" y="78" width="14" height="40" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1"/>
+            <!-- midline of red bar -->
+            <line x1="49" y1="87" x2="67" y2="87" stroke="#d4a84b" stroke-dasharray="2 2" stroke-width="0.5"/>
+          </svg>
+          <div class="specimen-caption">Long red, then green opens lower and closes above the red's midpoint</div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">Volume-Weighted</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="14" y1="30" x2="14" y2="70"/>
+              <rect x="10" y="35" width="8" height="25" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="32" y1="45" x2="32" y2="85"/>
+              <rect x="28" y="50" width="8" height="28" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <line x1="58" y1="55" x2="58" y2="120"/>
+            <rect x="51" y="60" width="14" height="55" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1"/>
+            <line x1="87" y1="70" x2="87" y2="125"/>
+            <rect x="72" y="78" width="30" height="40" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1.3"/>
+          </svg>
+          <div class="specimen-caption">The second bar shows heavy conviction &mdash; buyers arrived in force</div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>A long bearish candle is followed by a bullish candle that opens at a new low (or gaps down) and then closes at least halfway up into the body of the prior bar. The deeper the piercing, the stronger the signal. A piercing that closes above the prior open becomes a Bullish Engulfing.</p>
+        <p>The Piercing Line is weaker than a full engulfing but more common, especially in intraday settings where true gaps are rare.</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Width Adds</h4>
+        <p>The credibility of a piercing line hinges on whether the bulls showed up with real weight. A piercing candle on heavy volume is functionally close to a Bullish Engulfing &mdash; the geometric technicality matters less than the participation.</p>
+        <p>On thin volume, the pattern often produces a dead-cat bounce that retraces within a few bars.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Matrix Vector</span>
+        <span class="name">Q4 → Q2 (Rebound)</span>
+        <span class="arrow">especially with heavy second-bar volume</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- XI. DARK CLOUD COVER -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="p11">
+    <div class="plate-meta">
+      <div class="plate-number">Plate XI</div>
+      <div class="plate-classif">
+        <span class="bear">Bearish</span> Reversal<br>
+        Two-bar<br>
+        <span class="tag">Piercing (inverse)</span>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q2 → Q4</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>Dark Cloud Cover <em>— Kabuse</em></h2>
+      <div class="kanji">&ldquo;Covering over&rdquo;</div>
+
+      <div class="specimens">
+        <div class="specimen">
+          <div class="specimen-label">Canonical · Equal-Width</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="14" y1="100" x2="14" y2="140"/>
+              <rect x="10" y="108" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="32" y1="75" x2="32" y2="115"/>
+              <rect x="28" y="85" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <line x1="58" y1="30" x2="58" y2="95"/>
+            <rect x="51" y="35" width="14" height="55" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1"/>
+            <line x1="82" y1="25" x2="82" y2="80"/>
+            <rect x="75" y="32" width="14" height="40" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1"/>
+            <line x1="49" y1="62" x2="67" y2="62" stroke="#d4a84b" stroke-dasharray="2 2" stroke-width="0.5"/>
+          </svg>
+          <div class="specimen-caption">Long green, then red opens higher and closes below the green's midpoint</div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">Volume-Weighted</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="14" y1="100" x2="14" y2="140"/>
+              <rect x="10" y="108" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="32" y1="75" x2="32" y2="115"/>
+              <rect x="28" y="85" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <line x1="58" y1="30" x2="58" y2="95"/>
+            <rect x="51" y="35" width="14" height="55" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1"/>
+            <line x1="87" y1="25" x2="87" y2="80"/>
+            <rect x="72" y="32" width="30" height="40" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1.3"/>
+          </svg>
+          <div class="specimen-caption">Heavy selling after the cheerful green &mdash; distribution into strength</div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>The bearish counterpart to the Piercing Line. A long bullish candle is followed by a bearish candle opening at a new high and closing below the midpoint of the prior body. The deeper the penetration, the stronger the signal.</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Width Adds</h4>
+        <p>As with the Piercing Line, the character of the reversal bar's volume tells most of the story. Heavy-volume dark cloud is distribution in action. Thin-volume dark cloud may just be profit-taking that resolves upward again.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Matrix Vector</span>
+        <span class="name">Q2 → Q4 (Climax)</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- XII. HARAMI -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="p12">
+    <div class="plate-meta">
+      <div class="plate-number">Plate XII</div>
+      <div class="plate-classif">
+        <span class="neutral">Reversal</span> or Indecision<br>
+        Two-bar<br>
+        <span class="tag">Harami</span>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q2 → Q3</span><br>
+        <span style="font-size:10px;color:var(--ink-mid)">(compression following trend)</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>The Harami <em>— Harami</em></h2>
+      <div class="kanji">&ldquo;Pregnant&rdquo;</div>
+
+      <div class="specimens">
+        <div class="specimen">
+          <div class="specimen-label">Canonical · Equal-Width</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="14" y1="100" x2="14" y2="140"/>
+              <rect x="10" y="108" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="32" y1="75" x2="32" y2="115"/>
+              <rect x="28" y="85" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Large green -->
+            <line x1="58" y1="30" x2="58" y2="95"/>
+            <rect x="51" y="35" width="14" height="55" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1.3"/>
+            <!-- Small red inside its body -->
+            <line x1="82" y1="50" x2="82" y2="75"/>
+            <rect x="78" y="55" width="8" height="18" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1"/>
+          </svg>
+          <div class="specimen-caption">A large body with a small opposite-color body nestled entirely inside its range &mdash; &ldquo;the mother with child&rdquo;</div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">Volume-Weighted</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="14" y1="100" x2="14" y2="140"/>
+              <rect x="10" y="108" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="32" y1="75" x2="32" y2="115"/>
+              <rect x="28" y="85" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Wide green mother -->
+            <line x1="60" y1="30" x2="60" y2="95"/>
+            <rect x="48" y="35" width="24" height="55" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1.3"/>
+            <!-- Narrow red child = exhaustion -->
+            <line x1="90" y1="50" x2="90" y2="75"/>
+            <rect x="87" y="55" width="6" height="18" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1"/>
+          </svg>
+          <div class="specimen-caption">Wide mother (conviction) followed by narrow child (exhaustion) &mdash; the trend's breath is held</div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>A long-bodied candle is followed by a small-bodied candle of the opposite color whose body is entirely contained within the prior body. It is the opposite of an engulfing: rather than the second candle swallowing the first, the second candle is swallowed.</p>
+        <p>The Harami suggests the prevailing trend has paused &mdash; not reversed, but lost conviction. Nison treats it as a weaker reversal signal than engulfing but notes that the Harami Cross (where the inside candle is a doji) is a much stronger pattern.</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Width Adds</h4>
+        <p>The volume dimension is <em>diagnostic</em> here. A proper Harami should show a wide mother (strong trend bar) followed by a narrow child (dwindling participation) &mdash; this is the textbook exhaustion signature.</p>
+        <p>If the child is wide instead, you do not have a Harami at all &mdash; you have a battle bar that merely happens to sit within the mother's range. That is a very different event.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Matrix Vector</span>
+        <span class="name">Q2 → Q3 (Cooling)</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- XIII. TWEEZERS -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="p13">
+    <div class="plate-meta">
+      <div class="plate-number">Plate XIII</div>
+      <div class="plate-classif">
+        <span class="neutral">Reversal</span> Confirmation<br>
+        Two-bar<br>
+        <span class="tag">Tweezers</span>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q4 Wall</span><br>
+        <span style="font-size:10px;color:var(--ink-mid)">twice consecutively</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>Tweezers Top &amp; Bottom</h2>
+      <div class="kanji">&ldquo;Matched shadows&rdquo;</div>
+
+      <div class="specimens">
+        <div class="specimen">
+          <div class="specimen-label">Canonical · Tweezers Top</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="14" y1="90" x2="14" y2="130"/>
+              <rect x="10" y="100" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="32" y1="70" x2="32" y2="110"/>
+              <rect x="28" y="78" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Two bars with matching high -->
+            <line x1="58" y1="30" x2="58" y2="85"/>
+            <rect x="53" y="50" width="10" height="30" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1"/>
+            <line x1="80" y1="30" x2="80" y2="90"/>
+            <rect x="75" y="50" width="10" height="30" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1"/>
+            <!-- Tweezers annotation -->
+            <line x1="52" y1="25" x2="88" y2="25" stroke="#d4a84b" stroke-dasharray="2 2" stroke-width="0.6"/>
+            <text x="70" y="19" text-anchor="middle" font-family="EB Garamond" font-style="italic" font-size="9" fill="#d4a84b">matched high</text>
+          </svg>
+          <div class="specimen-caption">Two candles that touch the same high &mdash; tweezer-like twin peaks</div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">Canonical · Tweezers Bottom</div>
+          <svg class="specimen-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="14" y1="30" x2="14" y2="65"/>
+              <rect x="10" y="38" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="32" y1="45" x2="32" y2="85"/>
+              <rect x="28" y="53" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <line x1="58" y1="65" x2="58" y2="120"/>
+            <rect x="53" y="70" width="10" height="30" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1"/>
+            <line x1="80" y1="60" x2="80" y2="120"/>
+            <rect x="75" y="70" width="10" height="30" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1"/>
+            <line x1="52" y1="125" x2="88" y2="125" stroke="#d4a84b" stroke-dasharray="2 2" stroke-width="0.6"/>
+            <text x="70" y="138" text-anchor="middle" font-family="EB Garamond" font-style="italic" font-size="9" fill="#d4a84b">matched low</text>
+          </svg>
+          <div class="specimen-caption">Two candles that touch the same low &mdash; a double-bottom miniature</div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>Two consecutive candles that reach the same extreme price (the same high at a top, or the same low at a bottom). Tweezers are a minor pattern on their own but gain significance when combined with other signals, or when the second candle exhibits a reversal character of its own (such as a doji or hammer).</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Width Adds</h4>
+        <p>Tweezers are fundamentally about rejection at a level twice. The volume dimension tells you <em>how much</em> participation was rejected. Two wide bars with matched extremes is a powerful double-absorption pattern &mdash; essentially two consecutive Wall quadrant candles at the same price, strongly implying institutional absorption.</p>
+        <p>Two narrow bars at the same extreme is less meaningful; it may simply be that no one tested the level.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Matrix Signature</span>
+        <span class="name">Consecutive Q4 at same price</span>
+      </div>
+    </div>
+  </article>
+
+  <div class="section-break">Three-Bar Patterns</div>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- XIV. MORNING & EVENING STAR -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="p14">
+    <div class="plate-meta">
+      <div class="plate-number">Plate XIV</div>
+      <div class="plate-classif">
+        <span class="bull">Bullish</span> / <span class="bear">Bearish</span> Reversal<br>
+        Three-bar<br>
+        <span class="tag">Star Group</span>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q2 → Q3 → Q2</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>Morning Star &amp; Evening Star</h2>
+      <div class="kanji">&ldquo;Sankawa ake no myōjō&rdquo; &middot; &ldquo;Sankawa yoi no myōjō&rdquo;</div>
+
+      <div class="specimens">
+        <div class="specimen">
+          <div class="specimen-label">Morning Star · Bullish</div>
+          <svg class="specimen-svg" viewBox="0 0 130 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="12" y1="30" x2="12" y2="70"/>
+              <rect x="8" y="40" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Long red -->
+            <line x1="40" y1="30" x2="40" y2="95"/>
+            <rect x="33" y="40" width="14" height="45" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1"/>
+            <!-- Small-body middle (doji-ish, gap down) -->
+            <line x1="68" y1="100" x2="68" y2="125"/>
+            <rect x="64" y="107" width="8" height="12" fill="#d4a84b" fill-opacity="0.6" stroke="#d4a84b" stroke-width="1"/>
+            <!-- Long green -->
+            <line x1="96" y1="40" x2="96" y2="105"/>
+            <rect x="89" y="45" width="14" height="50" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1"/>
+          </svg>
+          <div class="specimen-caption">Long red &rarr; small star (often a doji) &rarr; long green. A bottom forming over three sessions.</div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">Evening Star · Bearish</div>
+          <svg class="specimen-svg" viewBox="0 0 130 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="12" y1="90" x2="12" y2="130"/>
+              <rect x="8" y="95" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Long green -->
+            <line x1="40" y1="50" x2="40" y2="115"/>
+            <rect x="33" y="55" width="14" height="50" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1"/>
+            <!-- Small star at top -->
+            <line x1="68" y1="18" x2="68" y2="42"/>
+            <rect x="64" y="24" width="8" height="12" fill="#d4a84b" fill-opacity="0.6" stroke="#d4a84b" stroke-width="1"/>
+            <!-- Long red -->
+            <line x1="96" y1="55" x2="96" y2="120"/>
+            <rect x="89" y="60" width="14" height="50" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1"/>
+          </svg>
+          <div class="specimen-caption">Long green &rarr; small star &rarr; long red. A top forming over three sessions.</div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>Among Nison's most highly regarded reversal patterns. The Morning Star begins with a long bearish candle, followed by a small-bodied candle that gaps down (the "star"), and concludes with a long bullish candle that closes well into the body of the first. The Evening Star is the mirror image at a top. When the star itself is a doji, the pattern becomes the Morning/Evening Doji Star, which is considered stronger still.</p>
+        <p>The three-bar pattern traces a narrative arc: exhaustion of the prior trend (bar 1), indecision and transfer of control (bar 2), and decisive reversal (bar 3).</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Width Adds</h4>
+        <p>The Morning/Evening Star maps almost perfectly onto a three-phase matrix path: wide-trend bar &rarr; narrow star &rarr; wide reversal bar. The cleanest versions show this volume arc: heavy effort at the peak/trough, near-zero effort at the star (the market holds its breath), then heavy effort in the reversal direction.</p>
+        <p>Uniform-width versions in which all three bars carry similar volume are weaker &mdash; the narrative of "pause, then turn" is what the volume arc makes visible.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Matrix Path</span>
+        <span class="name">Q2 → Q3 → Q2 (Exhaustion → Apathy → Ignition)</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- XV. THREE WHITE SOLDIERS & THREE BLACK CROWS -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="p15">
+    <div class="plate-meta">
+      <div class="plate-number">Plate XV</div>
+      <div class="plate-classif">
+        <span class="bull">Bullish</span> / <span class="bear">Bearish</span> Continuation<br>
+        Three-bar<br>
+        <span class="tag">Soldiers / Crows</span>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q2 sustained</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>Three White Soldiers &amp; Three Black Crows</h2>
+      <div class="kanji">&ldquo;Aka sanpei&rdquo; &middot; &ldquo;San-byō kabuse&rdquo;</div>
+
+      <div class="specimens">
+        <div class="specimen">
+          <div class="specimen-label">Three White Soldiers</div>
+          <svg class="specimen-svg" viewBox="0 0 130 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="12" y1="90" x2="12" y2="130"/>
+              <rect x="8" y="100" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Three consecutive green marching up -->
+            <line x1="40" y1="60" x2="40" y2="115"/>
+            <rect x="34" y="70" width="12" height="40" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1"/>
+            <line x1="68" y1="40" x2="68" y2="95"/>
+            <rect x="62" y="50" width="12" height="40" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1"/>
+            <line x1="96" y1="20" x2="96" y2="75"/>
+            <rect x="90" y="30" width="12" height="40" fill="#7ab67a" fill-opacity="0.18" stroke="#7ab67a" stroke-width="1"/>
+          </svg>
+          <div class="specimen-caption">Three consecutive long green bars, each opening inside the prior body and closing at a new high</div>
+        </div>
+        <div class="specimen">
+          <div class="specimen-label">Three Black Crows</div>
+          <svg class="specimen-svg" viewBox="0 0 130 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="12" y1="30" x2="12" y2="65"/>
+              <rect x="8" y="38" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <line x1="40" y1="30" x2="40" y2="85"/>
+            <rect x="34" y="40" width="12" height="40" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1"/>
+            <line x1="68" y1="50" x2="68" y2="105"/>
+            <rect x="62" y="60" width="12" height="40" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1"/>
+            <line x1="96" y1="70" x2="96" y2="125"/>
+            <rect x="90" y="80" width="12" height="40" fill="#e06868" fill-opacity="0.85" stroke="#e06868" stroke-width="1"/>
+          </svg>
+          <div class="specimen-caption">Three consecutive long red bars stepping down in formation</div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>Strong continuation patterns signaling that a trend has firmly established itself. Each of the three bars opens within the previous body and closes at a new high (or low). The pattern is most significant when appearing after a consolidation or a prior pattern that resolved directionally.</p>
+        <p>These are among the clearest patterns in the canon &mdash; no ambiguity, just sustained pressure in one direction over multiple sessions.</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Width Adds</h4>
+        <p>Three Soldiers on <em>increasing</em> volume is the canonical healthy trend &mdash; each bar commits more capital than the last. This is sustained Q2 Engine, the matrix's strongest continuation signature.</p>
+        <p>Three Soldiers on <em>decreasing</em> volume is a warning. The geometric pattern is the same, but the trend is being supported by fewer and fewer participants &mdash; a Q2-to-Q1 drift that often precedes a reversal. No traditional name exists for this distinction, but it is one of the most important volume-weighted refinements in practice.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Matrix Signature</span>
+        <span class="name">Three consecutive Q2 cells (Soldiers/Crows)</span><br>
+        <span class="arrow" style="margin-top:4px">Q2 → Q1 drift with declining width = hidden divergence</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       PART II — L2-AUGMENTED SCENARIOS
+       ═══════════════════════════════════════════════════════════════ -->
+
+  <div class="part-break">
+    <span class="kicker">Part II</span>
+    <h2>The <em>L2-Ghost</em> Overlay</h2>
+    <div class="lede">
+      Beneath every executed candle lies an unexecuted one &mdash; the resting order book
+      at the moment the interval began. When the two diverge, the alpha appears.
+    </div>
+  </div>
+
+  <!-- ─── PRIMER PLATE ─── -->
+  <section class="primer" id="primer">
+    <div class="primer-eyebrow">Primer &middot; How to Read a Ghost Candle</div>
+    <h3>The Two Overlays</h3>
+    <div class="primer-body">
+      <p>The canonical candlestick tells us what <em>happened</em> during an interval &mdash; what price did while the clock ran. It cannot tell us about the resting state of the market: the queue of orders that stood waiting before the first trade printed, the depth stacked behind the bid and the ask, the structural intentions of participants who never got executed.</p>
+
+      <p>The <strong>Ghost Candle</strong> is that second overlay. It is rendered beneath the price candle as a translucent specimen, sharing the same center point but with different dimensions:</p>
+
+      <div class="primer-legend">
+        <div class="col">
+          <div class="col-title">The Price Candle</div>
+          <div class="col-sub">Work done during the interval</div>
+          <dl>
+            <dt>Width</dt>
+            <dd>Executed volume &mdash; how much capital actually changed hands</dd>
+            <dt>Height</dt>
+            <dd>Body range &mdash; how far price traveled from open to close</dd>
+            <dt>Color</dt>
+            <dd>Execution pressure &mdash; green when buyers overwhelmed infrastructure, red when sellers did</dd>
+            <dt>Wicks</dt>
+            <dd>Rejected reality &mdash; prices that printed but could not hold</dd>
+          </dl>
+        </div>
+        <div class="col">
+          <div class="col-title">The Ghost Candle</div>
+          <div class="col-sub">State of the book at interval start</div>
+          <dl>
+            <dt>Width</dt>
+            <dd>L2 depth &mdash; how thick the resting queue was, independent of what executed</dd>
+            <dt>Height</dt>
+            <dd>Book thickness &mdash; how much depth stood behind the spread</dd>
+            <dt>Color</dt>
+            <dd>Book imbalance &mdash; cyan if bids were heavier, coral if asks, grey if balanced</dd>
+            <dt>Wicks</dt>
+            <dd>Structural guardrails &mdash; orders resting far from the spread</dd>
+          </dl>
+        </div>
+      </div>
+
+      <p style="margin-top: 24px;"><strong>Coherence</strong> is the alignment between these two overlays. When the price candle and ghost candle broadly agree in size and color, the market is telling a single story &mdash; execution matches infrastructure, and what we see is what was intended. When they diverge, the market is telling two stories at once: the executed one and the hidden one. The <em>divergent</em> cases are where structural opportunity lives.</p>
+
+      <p>Part II catalogs the named scenarios that arise from specific combinations of price and ghost. The four <strong>key scenarios</strong> are the canonical extremes. The seven <strong>supplementary scenarios</strong> are variations worth recognizing by name in a live tape.</p>
+    </div>
+  </section>
+
+  <div class="section-break">Key Scenarios</div>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- SCENARIO A · THE ENGINE -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="sA">
+    <div class="plate-meta">
+      <div class="plate-number">Scenario A</div>
+      <div class="plate-classif">
+        <span class="bull">Bullish</span> Continuation<br>
+        Dual-layer<br>
+        <span class="tag">Coordinate (10, 9)</span>
+        <div class="coherence-badge coherent">Coherent &middot; High</div>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q2 Engine</span><br>
+        <span style="font-size:10px;color:var(--ink-mid)">Climactic · Phat L2</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>The Engine <em>— Full Conviction</em></h2>
+      <div class="kanji">Where execution matches infrastructure in their fullest expression</div>
+
+      <div class="specimens">
+        <div class="specimen-dual">
+          <div class="specimen-label">Dual-Layer · Coherent</div>
+          <svg class="specimen-dual-svg" viewBox="0 0 120 150">
+            <!-- Ghost candle: wide + tall + cyan (bid-heavy book, deep) -->
+            <line x1="60" y1="12" x2="60" y2="30" stroke="#00d9ff" stroke-width="0.6" opacity="0.5"/>
+            <line x1="60" y1="122" x2="60" y2="140" stroke="#00d9ff" stroke-width="0.6" opacity="0.5"/>
+            <rect x="22" y="30" width="76" height="92" fill="#00d9ff" fill-opacity="0.18" stroke="#00d9ff" stroke-width="0.6" opacity="0.7"/>
+            <!-- Price candle on top: wide + tall + green (buyers overwhelming) -->
+            <line x1="60" y1="36" x2="60" y2="44" stroke="#7ab67a" stroke-width="1"/>
+            <line x1="60" y1="108" x2="60" y2="116" stroke="#7ab67a" stroke-width="1"/>
+            <rect x="30" y="44" width="60" height="64" fill="#7ab67a" fill-opacity="0.42" stroke="#7ab67a" stroke-width="1.2"/>
+          </svg>
+          <div class="dual-legend">
+            <span class="lg-item"><span class="swatch" style="color:#7ab67a;background:rgba(122,182,122,0.42)"></span>price</span>
+            <span class="lg-item"><span class="swatch ghost" style="color:#00d9ff;background:rgba(0,217,255,0.18)"></span>ghost</span>
+          </div>
+        </div>
+        <div class="specimen-dual">
+          <div class="specimen-label">In the Wild</div>
+          <svg class="specimen-dual-svg" viewBox="0 0 120 150">
+            <!-- context bars -->
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="14" y1="75" x2="14" y2="110"/>
+              <rect x="10" y="82" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="30" y1="65" x2="30" y2="100"/>
+              <rect x="26" y="72" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Ghost beneath -->
+            <rect x="48" y="32" width="56" height="80" fill="#00d9ff" fill-opacity="0.14" stroke="#00d9ff" stroke-width="0.5" opacity="0.65"/>
+            <!-- Price on top, same direction + color -->
+            <line x1="76" y1="30" x2="76" y2="38" stroke="#7ab67a" stroke-width="1"/>
+            <line x1="76" y1="110" x2="76" y2="118" stroke="#7ab67a" stroke-width="1"/>
+            <rect x="52" y="38" width="48" height="72" fill="#7ab67a" fill-opacity="0.42" stroke="#7ab67a" stroke-width="1.2"/>
+          </svg>
+          <div class="dual-legend">
+            <span class="lg-item"><span class="swatch" style="color:#7ab67a;background:rgba(122,182,122,0.42)"></span>price</span>
+            <span class="lg-item"><span class="swatch ghost" style="color:#00d9ff;background:rgba(0,217,255,0.18)"></span>ghost</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>Both overlays are wide, tall, and directionally agreeing. The price candle reports a decisive bullish execution on heavy volume. The ghost candle reports that the resting order book was already deep and bid-leaning before the interval began &mdash; the infrastructure was in place to support exactly this move.</p>
+        <p>This is the matrix's cleanest signal. The executed trend is not a solo act by aggressive takers: it is the consummation of structure that was already there, now made visible through participation. In the prototype's terms, the volume-to-depth ratio sits in balance, and the book imbalance leans to match the execution.</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Ghost Adds</h4>
+        <p>Without the ghost overlay, a wide green candle is simply a strong bar. With it, we can see whether that strength was <strong>improvised</strong> &mdash; buyers who happened to overwhelm a normal book &mdash; or whether it was <strong>built for</strong> &mdash; buyers stepping into depth that was already asymmetric in their favor.</p>
+        <p>The Engine is the latter. It is the most persistent continuation signal in the augmented vocabulary; when both layers agree at extremity, the move tends to extend rather than exhaust.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Vector</span>
+        <span class="name">Q2 sustained &middot; expect continuation</span>
+        <span class="arrow">unlike its Q2 cousin in Part I, the ghost confirms the move is structurally earned</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- SCENARIO B · THE SLIP -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="sB">
+    <div class="plate-meta">
+      <div class="plate-number">Scenario B</div>
+      <div class="plate-classif">
+        <span class="bear">Bearish</span> Trap<br>
+        Dual-layer<br>
+        <span class="tag">Coordinate (10, 5)</span>
+        <div class="coherence-badge divergent">Divergent</div>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q1 Vacuum</span><br>
+        <span style="font-size:10px;color:var(--ink-mid)">Climactic · Hollow L2</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>The Slip <em>— Ghost Trap</em></h2>
+      <div class="kanji">A dramatic move that infrastructure cannot support</div>
+
+      <div class="specimens">
+        <div class="specimen-dual">
+          <div class="specimen-label">Dual-Layer · Divergent</div>
+          <svg class="specimen-dual-svg" viewBox="0 0 120 150">
+            <!-- Ghost candle: narrow + shallow (hollow book) -->
+            <line x1="60" y1="58" x2="60" y2="68" stroke="#a0a9b8" stroke-width="0.4" opacity="0.4"/>
+            <line x1="60" y1="82" x2="60" y2="92" stroke="#a0a9b8" stroke-width="0.4" opacity="0.4"/>
+            <rect x="52" y="68" width="16" height="14" fill="#a0a9b8" fill-opacity="0.12" stroke="#a0a9b8" stroke-width="0.5" opacity="0.5"/>
+            <!-- Price candle: tall + wide + red (heavy sell on no depth) -->
+            <line x1="60" y1="16" x2="60" y2="28" stroke="#e06868" stroke-width="1"/>
+            <line x1="60" y1="116" x2="60" y2="130" stroke="#e06868" stroke-width="1"/>
+            <rect x="28" y="28" width="64" height="88" fill="#e06868" fill-opacity="0.62" stroke="#e06868" stroke-width="1.2"/>
+            <!-- divergence indicator -->
+            <circle cx="108" cy="12" r="2.5" fill="#d4a84b" opacity="0.85"/>
+          </svg>
+          <div class="dual-legend">
+            <span class="lg-item"><span class="swatch" style="color:#e06868;background:rgba(224,104,104,0.62)"></span>price</span>
+            <span class="lg-item"><span class="swatch ghost" style="color:#a0a9b8;background:rgba(160,169,184,0.12)"></span>ghost</span>
+          </div>
+        </div>
+        <div class="specimen-dual">
+          <div class="specimen-label">In the Wild</div>
+          <svg class="specimen-dual-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="14" y1="50" x2="14" y2="85"/>
+              <rect x="10" y="55" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="30" y1="40" x2="30" y2="75"/>
+              <rect x="26" y="45" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- Shallow ghost under dramatic price drop -->
+            <rect x="68" y="72" width="16" height="12" fill="#a0a9b8" fill-opacity="0.1" stroke="#a0a9b8" stroke-width="0.4" opacity="0.5"/>
+            <!-- Large red price candle -->
+            <line x1="76" y1="22" x2="76" y2="30" stroke="#e06868" stroke-width="1"/>
+            <line x1="76" y1="118" x2="76" y2="126" stroke="#e06868" stroke-width="1"/>
+            <rect x="50" y="30" width="52" height="88" fill="#e06868" fill-opacity="0.62" stroke="#e06868" stroke-width="1.2"/>
+          </svg>
+          <div class="dual-legend">
+            <span class="lg-item"><span class="swatch" style="color:#e06868;background:rgba(224,104,104,0.62)"></span>price</span>
+            <span class="lg-item"><span class="swatch ghost" style="color:#a0a9b8;background:rgba(160,169,184,0.12)"></span>ghost</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>The price candle is dramatic &mdash; wide volume, long body, heavy color. But the ghost candle is a small shadow: when the interval began, the book was thin and neutrally balanced. There was no structural foundation for the move that followed.</p>
+        <p>In practice, The Slip is how flash events happen. A modest aggressor arrives at a moment when resting depth is unusually shallow. The trade prints at extremity not because a consensus shifted but because there was no floor to catch it. The ghost tells you the move was executed into a vacuum.</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Ghost Adds</h4>
+        <p>This scenario does not exist in the traditional vocabulary. A canonical Marubozu on a trader's chart looks triumphant &mdash; full conviction in a single direction. With the ghost overlay, the same candle can be revealed as a <strong>stop run through a hollow book</strong>, which is a fundamentally different event and warrants the opposite trade.</p>
+        <p>The Slip is the strongest mean-reversion setup in the augmented vocabulary. Price that traveled far without infrastructure must, statistically, return to where infrastructure exists.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Vector</span>
+        <span class="name">Q2-appearance &rarr; Q4 reversion</span>
+        <span class="arrow">closest Part I cousin: wide Marubozu on anemic volume, but sharper</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- SCENARIO C · COHERENCE -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="sC">
+    <div class="plate-meta">
+      <div class="plate-number">Scenario C</div>
+      <div class="plate-classif">
+        <span class="neutral">Neutral</span> &middot; Preparatory<br>
+        Dual-layer<br>
+        <span class="tag">Coordinate (3, 5)</span>
+        <div class="coherence-badge balanced">Balanced</div>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q3 Apathy</span><br>
+        <span style="font-size:10px;color:var(--ink-mid)">Coiled Spring</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>Coherence <em>— Balanced</em></h2>
+      <div class="kanji">The stillness that precedes a move &mdash; both layers in near-perfect equilibrium</div>
+
+      <div class="specimens">
+        <div class="specimen-dual">
+          <div class="specimen-label">Dual-Layer · Balanced</div>
+          <svg class="specimen-dual-svg" viewBox="0 0 120 150">
+            <!-- Narrow ghost, balanced grey -->
+            <line x1="60" y1="55" x2="60" y2="65" stroke="#a0a9b8" stroke-width="0.5" opacity="0.4"/>
+            <line x1="60" y1="85" x2="60" y2="95" stroke="#a0a9b8" stroke-width="0.5" opacity="0.4"/>
+            <rect x="50" y="65" width="20" height="20" fill="#a0a9b8" fill-opacity="0.16" stroke="#a0a9b8" stroke-width="0.5" opacity="0.7"/>
+            <!-- Narrow price, neutral -->
+            <line x1="60" y1="62" x2="60" y2="70" stroke="#7a8195" stroke-width="0.9"/>
+            <line x1="60" y1="80" x2="60" y2="88" stroke="#7a8195" stroke-width="0.9"/>
+            <rect x="54" y="70" width="12" height="10" fill="#7a8195" fill-opacity="0.45" stroke="#7a8195" stroke-width="1.2"/>
+          </svg>
+          <div class="dual-legend">
+            <span class="lg-item"><span class="swatch" style="color:#7a8195;background:rgba(122,129,149,0.45)"></span>price</span>
+            <span class="lg-item"><span class="swatch ghost" style="color:#a0a9b8;background:rgba(160,169,184,0.16)"></span>ghost</span>
+          </div>
+        </div>
+        <div class="specimen-dual">
+          <div class="specimen-label">In the Wild</div>
+          <svg class="specimen-dual-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="14" y1="65" x2="14" y2="88"/>
+              <rect x="10" y="70" width="8" height="14" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="30" y1="60" x2="30" y2="88"/>
+              <rect x="26" y="68" width="8" height="18" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="46" y1="62" x2="46" y2="87"/>
+              <rect x="42" y="66" width="8" height="18" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <rect x="66" y="68" width="18" height="16" fill="#a0a9b8" fill-opacity="0.14" stroke="#a0a9b8" stroke-width="0.5" opacity="0.65"/>
+            <rect x="69" y="71" width="12" height="10" fill="#7a8195" fill-opacity="0.45" stroke="#7a8195" stroke-width="1"/>
+          </svg>
+          <div class="dual-legend">
+            <span class="lg-item"><span class="swatch" style="color:#7a8195;background:rgba(122,129,149,0.45)"></span>price</span>
+            <span class="lg-item"><span class="swatch ghost" style="color:#a0a9b8;background:rgba(160,169,184,0.14)"></span>ghost</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>Both overlays are narrow, small, and directionally neutral. Neither buyers nor sellers made a decisive incursion during the interval, and the book's standing state is symmetric. The candle is a compressed point.</p>
+        <p>Coherence is not a reversal signal &mdash; it is a <em>preparation</em> signal. Something important is often about to happen, but the direction is not yet encoded in either overlay. The longer Coherence persists, the more decisive its eventual breakout tends to be. Wyckoff called this the spring loading; the prototype calls it the balanced state.</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Ghost Adds</h4>
+        <p>A narrow candle in isolation could mean anything. With the ghost overlay we can tell <strong>honest balance</strong> (both layers narrow, aligned, symmetric) from a <strong>compressed Slip</strong> or <strong>hidden accumulation</strong> &mdash; superficially similar-looking candles whose ghosts reveal very different underlying conditions.</p>
+        <p>True Coherence is the absence of both signal and noise. Watch for it; it is where the best setups gestate.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Vector</span>
+        <span class="name">Q3 Apathy &rarr; pending ignition</span>
+        <span class="arrow">direction unknown until next bar breaks coherence</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- SCENARIO D · HIDDEN FLOOR -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <article class="plate" id="sD">
+    <div class="plate-meta">
+      <div class="plate-number">Scenario D</div>
+      <div class="plate-classif">
+        <span class="bull">Bullish</span> Accumulation<br>
+        Dual-layer<br>
+        <span class="tag">Coordinate (1, 9)</span>
+        <div class="coherence-badge divergent">Divergent</div>
+      </div>
+      <div class="coord-ref">
+        <span class="label">Matrix Cousin</span>
+        <span class="quad">Q4 Wall</span><br>
+        <span style="font-size:10px;color:var(--ink-mid)">Silent Absorption</span>
+      </div>
+    </div>
+    <div class="plate-main">
+      <h2>Hidden Floor <em>— Silent Accumulation</em></h2>
+      <div class="kanji">A thin, weak-looking candle resting on a massive unseen bid</div>
+
+      <div class="specimens">
+        <div class="specimen-dual">
+          <div class="specimen-label">Dual-Layer · Divergent</div>
+          <svg class="specimen-dual-svg" viewBox="0 0 120 150">
+            <!-- Large cyan ghost (heavy bids) -->
+            <line x1="60" y1="14" x2="60" y2="28" stroke="#00d9ff" stroke-width="0.6" opacity="0.5"/>
+            <line x1="60" y1="122" x2="60" y2="138" stroke="#00d9ff" stroke-width="0.6" opacity="0.5"/>
+            <rect x="22" y="28" width="76" height="94" fill="#00d9ff" fill-opacity="0.22" stroke="#00d9ff" stroke-width="0.7" opacity="0.75"/>
+            <!-- Small neutral/slightly-red price sitting inside -->
+            <line x1="60" y1="65" x2="60" y2="72" stroke="#7a8195" stroke-width="0.8"/>
+            <line x1="60" y1="82" x2="60" y2="90" stroke="#7a8195" stroke-width="0.8"/>
+            <rect x="54" y="72" width="12" height="10" fill="#7a8195" fill-opacity="0.45" stroke="#7a8195" stroke-width="1"/>
+            <!-- divergence indicator -->
+            <circle cx="108" cy="12" r="2.5" fill="#d4a84b" opacity="0.85"/>
+          </svg>
+          <div class="dual-legend">
+            <span class="lg-item"><span class="swatch" style="color:#7a8195;background:rgba(122,129,149,0.45)"></span>price</span>
+            <span class="lg-item"><span class="swatch ghost" style="color:#00d9ff;background:rgba(0,217,255,0.22)"></span>ghost</span>
+          </div>
+        </div>
+        <div class="specimen-dual">
+          <div class="specimen-label">In the Wild</div>
+          <svg class="specimen-dual-svg" viewBox="0 0 120 150">
+            <g stroke="#3d352c" stroke-width="1" fill="#3d352c">
+              <line x1="14" y1="45" x2="14" y2="80"/>
+              <rect x="10" y="52" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="30" y1="55" x2="30" y2="90"/>
+              <rect x="26" y="60" width="8" height="22" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+              <line x1="46" y1="68" x2="46" y2="95"/>
+              <rect x="42" y="75" width="8" height="16" fill="#2a2620" stroke="#4a4239" stroke-width="0.7"/>
+            </g>
+            <!-- massive cyan ghost beneath -->
+            <rect x="52" y="30" width="50" height="90" fill="#00d9ff" fill-opacity="0.18" stroke="#00d9ff" stroke-width="0.6" opacity="0.7"/>
+            <!-- small weak red price -->
+            <line x1="77" y1="68" x2="77" y2="75" stroke="#e06868" stroke-width="0.8"/>
+            <line x1="77" y1="88" x2="77" y2="95" stroke="#e06868" stroke-width="0.8"/>
+            <rect x="72" y="75" width="10" height="13" fill="#e06868" fill-opacity="0.55" stroke="#e06868" stroke-width="1"/>
+          </svg>
+          <div class="dual-legend">
+            <span class="lg-item"><span class="swatch" style="color:#e06868;background:rgba(224,104,104,0.55)"></span>price</span>
+            <span class="lg-item"><span class="swatch ghost" style="color:#00d9ff;background:rgba(0,217,255,0.18)"></span>ghost</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="description">
+        <p>The price candle is small, possibly bearish, unremarkable in traditional terms. But the ghost candle is enormous and decidedly bid-heavy. A giant queue of resting buy orders is stacked beneath the current price, though very little of that queue was touched during the interval.</p>
+        <p>This is the signature of silent institutional accumulation. Patient buyers have parked size; the tape is not yet rewarding them with executed trades, but they are present and they are not leaving. Price may linger or even dip further &mdash; but the floor is not where the price candle suggests; it is where the ghost is.</p>
+      </div>
+
+      <div class="distinction">
+        <h4>What the Ghost Adds</h4>
+        <p>This is perhaps the clearest case where ghost analysis <em>inverts</em> the traditional reading. A small red candle on thin volume looks like nothing &mdash; Apathy or early weakness. With the ghost revealed, the same candle is recast as an <strong>iceberg bid</strong>: massive latent demand that has not yet forced itself onto the tape.</p>
+        <p>Hidden Floor is the bullish twin of The Slip. Where The Slip is dramatic execution over no infrastructure, Hidden Floor is minimal execution over massive infrastructure. Both are structural mispricings; both tend to resolve in favor of the ghost.</p>
+      </div>
+
+      <div class="cousin">
+        <span class="label">Vector</span>
+        <span class="name">Apparent Q3 &rarr; true Q4 accumulation</span>
+        <span class="arrow">closest Part I cousin: narrow Harami, but infrastructurally meaningful</span>
+      </div>
+    </div>
+  </article>
+
+  <div class="section-break">Supplementary Scenarios</div>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- SUPPLEMENTARY SCENARIO GRID (E-K) -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="scenario-grid">
+
+    <div class="scenario-card" id="sE">
+      <div class="sc-coord">Scenario E &middot; Coord (10, 2)</div>
+      <h4>Flash Crash</h4>
+      <div class="sc-sub">An acute Slip variant &middot; Divergent</div>
+      <div class="sc-svg-wrap">
+        <svg class="sc-svg" viewBox="0 0 120 100">
+          <rect x="54" y="42" width="12" height="10" fill="#a0a9b8" fill-opacity="0.1" stroke="#a0a9b8" stroke-width="0.4" opacity="0.5"/>
+          <line x1="60" y1="8" x2="60" y2="18" stroke="#e06868" stroke-width="0.8"/>
+          <line x1="60" y1="80" x2="60" y2="92" stroke="#e06868" stroke-width="0.8"/>
+          <rect x="28" y="18" width="64" height="62" fill="#e06868" fill-opacity="0.68" stroke="#e06868" stroke-width="1.2"/>
+          <circle cx="108" cy="10" r="2" fill="#d4a84b"/>
+        </svg>
+      </div>
+      <div class="sc-desc">A violent red candle with almost no L2 underneath. <em>Extreme Slip.</em> Likely triggered by a cascade of stops through a thin book. Snap-back is statistically strong provided structure re-forms in the following bars.</div>
+    </div>
+
+    <div class="scenario-card" id="sF">
+      <div class="sc-coord">Scenario F &middot; Coord (10, 10)</div>
+      <h4>Institutional Buy</h4>
+      <div class="sc-sub">Engine at maximum extension &middot; Coherent</div>
+      <div class="sc-svg-wrap">
+        <svg class="sc-svg" viewBox="0 0 120 100">
+          <rect x="14" y="12" width="92" height="76" fill="#00d9ff" fill-opacity="0.2" stroke="#00d9ff" stroke-width="0.6" opacity="0.7"/>
+          <line x1="60" y1="14" x2="60" y2="22" stroke="#7ab67a" stroke-width="0.8"/>
+          <line x1="60" y1="78" x2="60" y2="86" stroke="#7ab67a" stroke-width="0.8"/>
+          <rect x="22" y="22" width="76" height="56" fill="#7ab67a" fill-opacity="0.48" stroke="#7ab67a" stroke-width="1.2"/>
+        </svg>
+      </div>
+      <div class="sc-desc">Everything wide, tall, and green. Both overlays maxed. This is what a deliberate large-lot accumulator looks like on tape &mdash; the order book was stacked and the execution cleared the resistance. Rare and, when real, unmistakable.</div>
+    </div>
+
+    <div class="scenario-card" id="sG">
+      <div class="sc-coord">Scenario G &middot; Coord (2, 9)</div>
+      <h4>Wall Build</h4>
+      <div class="sc-sub">Quiet infrastructure gathering &middot; Divergent</div>
+      <div class="sc-svg-wrap">
+        <svg class="sc-svg" viewBox="0 0 120 100">
+          <rect x="18" y="18" width="84" height="66" fill="#00d9ff" fill-opacity="0.2" stroke="#00d9ff" stroke-width="0.6" opacity="0.7"/>
+          <rect x="55" y="44" width="10" height="14" fill="#7a8195" fill-opacity="0.45" stroke="#7a8195" stroke-width="1"/>
+        </svg>
+      </div>
+      <div class="sc-desc">A very small price candle centered inside a vast ghost. Unlike Hidden Floor (where the ghost is markedly bid-heavy), the Wall Build shows <em>unbiased depth</em> &mdash; a wall forming but not yet leaning. A signal that something is being prepared; direction still undetermined.</div>
+    </div>
+
+    <div class="scenario-card" id="sH">
+      <div class="sc-coord">Scenario H &middot; Various</div>
+      <h4>Ghost Divergence</h4>
+      <div class="sc-sub">Opposing colors &middot; Divergent</div>
+      <div class="sc-svg-wrap">
+        <svg class="sc-svg" viewBox="0 0 120 100">
+          <rect x="22" y="20" width="76" height="60" fill="#e06868" fill-opacity="0.2" stroke="#e06868" stroke-width="0.6" opacity="0.65"/>
+          <rect x="42" y="30" width="36" height="40" fill="#7ab67a" fill-opacity="0.48" stroke="#7ab67a" stroke-width="1.2"/>
+          <circle cx="108" cy="10" r="2" fill="#d4a84b"/>
+        </svg>
+      </div>
+      <div class="sc-desc">Price green, ghost red &mdash; or vice versa. The executed move contradicts the resting-book bias. <em>The most valuable diagnostic shape in the augmented catalog.</em> A green candle against a red ghost often marks a short squeeze; a red candle against a green ghost, a fade of weak longs into institutional bids.</div>
+    </div>
+
+    <div class="scenario-card" id="sI">
+      <div class="sc-coord">Scenario I &middot; Coord (2, 6)</div>
+      <h4>Silent Buyer</h4>
+      <div class="sc-sub">Thin tape with persistent bid weight &middot; Divergent</div>
+      <div class="sc-svg-wrap">
+        <svg class="sc-svg" viewBox="0 0 120 100">
+          <rect x="30" y="28" width="60" height="50" fill="#00d9ff" fill-opacity="0.18" stroke="#00d9ff" stroke-width="0.6" opacity="0.7"/>
+          <line x1="60" y1="48" x2="60" y2="52" stroke="#7ab67a" stroke-width="0.7"/>
+          <line x1="60" y1="58" x2="60" y2="62" stroke="#7ab67a" stroke-width="0.7"/>
+          <rect x="54" y="52" width="12" height="6" fill="#7ab67a" fill-opacity="0.5" stroke="#7ab67a" stroke-width="1"/>
+        </svg>
+      </div>
+      <div class="sc-desc">A narrow slightly-bullish candle with a much wider cyan ghost. The tape is quiet, but bids keep replenishing. Typical of early markup, when institutional hands are accumulating in size without announcing their presence. Closely related to Hidden Floor but with positive price action.</div>
+    </div>
+
+    <div class="scenario-card" id="sJ">
+      <div class="sc-coord">Scenario J &middot; Coord (10, 8)</div>
+      <h4>Bull Climax</h4>
+      <div class="sc-sub">Strong execution, weakening book &middot; Divergent (forward-looking)</div>
+      <div class="sc-svg-wrap">
+        <svg class="sc-svg" viewBox="0 0 120 100">
+          <rect x="44" y="32" width="32" height="40" fill="#00d9ff" fill-opacity="0.12" stroke="#00d9ff" stroke-width="0.4" opacity="0.55"/>
+          <line x1="60" y1="8" x2="60" y2="18" stroke="#7ab67a" stroke-width="0.8"/>
+          <line x1="60" y1="82" x2="60" y2="92" stroke="#7ab67a" stroke-width="0.8"/>
+          <rect x="26" y="18" width="68" height="64" fill="#7ab67a" fill-opacity="0.48" stroke="#7ab67a" stroke-width="1.2"/>
+        </svg>
+      </div>
+      <div class="sc-desc">The price candle looks like a classic strong green Engine, but the ghost beneath is only moderate. Buyers are winning on the tape, but the underlying depth that drove earlier bars has <em>thinned</em>. This is the first warning sign that an Engine trend is losing its structural foundation &mdash; often precedes a Slip.</div>
+    </div>
+
+    <div class="scenario-card" id="sK">
+      <div class="sc-coord">Scenario K &middot; Coord (9, 5)</div>
+      <h4>Exhaustion Spike</h4>
+      <div class="sc-sub">Rally into empty book &middot; Divergent</div>
+      <div class="sc-svg-wrap">
+        <svg class="sc-svg" viewBox="0 0 120 100">
+          <rect x="52" y="42" width="16" height="14" fill="#a0a9b8" fill-opacity="0.12" stroke="#a0a9b8" stroke-width="0.4" opacity="0.5"/>
+          <line x1="60" y1="10" x2="60" y2="18" stroke="#7ab67a" stroke-width="0.9"/>
+          <line x1="60" y1="80" x2="60" y2="90" stroke="#7ab67a" stroke-width="0.9"/>
+          <rect x="32" y="18" width="56" height="62" fill="#7ab67a" fill-opacity="0.52" stroke="#7ab67a" stroke-width="1.2"/>
+          <circle cx="108" cy="10" r="2" fill="#d4a84b"/>
+        </svg>
+      </div>
+      <div class="sc-desc">The bullish counterpart to The Slip. A large, decisive green candle executes into nearly no resting ask depth. The rally is real in that trades printed at those prices, but the infrastructure to defend them is missing. Expect sharp retracement once the momentum taker exits.</div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- APPENDIX -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <section class="appendix">
+    <div class="eyebrow">Appendix</div>
+    <h3>The Volume-Weighted Matrix in Brief</h3>
+    <div class="body">
+      <p>For reference, the volume-weighted matrix referenced throughout this catalog partitions candlestick space into four quadrants based on two percentile-ranked dimensions:</p>
+    </div>
+
+    <div class="quadrant-grid">
+      <div class="quad-cell">
+        <div class="quad-name">Q1 · Vacuum</div>
+        <div class="quad-loc">Low Volume · High Body Range</div>
+        <div class="quad-desc">Price moved on anemic participation. Liquidity gap or stop run. Structurally hollow, frequently snaps back.</div>
+      </div>
+      <div class="quad-cell">
+        <div class="quad-name">Q2 · Engine</div>
+        <div class="quad-loc">High Volume · High Body Range</div>
+        <div class="quad-desc">Effort and result in harmony. Institutional conviction, value migration, trend continuation's natural home.</div>
+      </div>
+      <div class="quad-cell">
+        <div class="quad-name">Q3 · Apathy</div>
+        <div class="quad-loc">Low Volume · Low Body Range</div>
+        <div class="quad-desc">Neither side committed. The waiting room &mdash; but a prolonged residency is a coiled spring.</div>
+      </div>
+      <div class="quad-cell">
+        <div class="quad-name">Q4 · Wall</div>
+        <div class="quad-loc">High Volume · Low Body Range</div>
+        <div class="quad-desc">Massive effort absorbed by a counter-party. The squat. Where trends die and reversals are born.</div>
+      </div>
+    </div>
+
+    <div class="body">
+      <p>The <em>named vectors</em> describe transitions between quadrants over consecutive bars. <em>Fake-out</em> (Q3&rarr;Q1) is a breakout with no participation. <em>Confirmation</em> (Q1&rarr;Q2) is real money validating a thin move. <em>Climax</em> (Q2&rarr;Q4) is the trend hitting a wall. <em>Exhaustion</em> (Q4&rarr;Q3) is the spent market. <em>Ignition</em> (Q3&rarr;Q2) is the coiled spring releasing. <em>Thinning</em> (Q2&rarr;Q1) is momentum outpacing its fuel.</p>
+      <p>These vectors are the volume-weighted matrix's native vocabulary for the transitions that the Japanese canon names as multi-bar reversal patterns. Where the canon names the shape, the matrix names the motion.</p>
+    </div>
+  </section>
+
+  <footer>
+    A Companion Reference to the Volume-Weighted Candlestick Matrix<br>
+    <em>Part I after Nison &middot; Japanese Candlestick Charting Techniques (1991)<br>
+    Part II after the Fractal Phatness Matrix &middot; Dual-layer L2-Ghost prototype</em>
+  </footer>
+
+</div>
+</body>
+</html>

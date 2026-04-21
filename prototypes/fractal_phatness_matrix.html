@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fractal Phatness Matrix — Scale-Dependent Geometry Atlas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700&display=swap');
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 50%, #0f1419 100%);
+            color: #e0e6f0;
+            line-height: 1.6;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 40px;
+            border-bottom: 1px solid rgba(33, 160, 149, 0.3);
+            padding-bottom: 20px;
+        }
+
+        h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(120deg, #21a095 0%, #00d9ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            color: #a0a9b8;
+            margin-bottom: 8px;
+        }
+
+        .tagline {
+            font-size: 0.8rem;
+            color: #7a8195;
+            font-style: italic;
+        }
+
+        .controls {
+            margin-bottom: 32px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .control-label {
+            font-family: 'Syne', sans-serif;
+            font-size: 0.85rem;
+            color: #21a095;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        select {
+            padding: 10px 12px;
+            background: rgba(26, 31, 46, 0.9);
+            border: 1px solid rgba(33, 160, 149, 0.4);
+            color: #00d9ff;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        select:hover {
+            border-color: rgba(33, 160, 149, 0.6);
+            box-shadow: 0 0 8px rgba(33, 160, 149, 0.2);
+        }
+
+        select:option {
+            background: #0f1419;
+            color: #e0e6f0;
+        }
+
+        .timeframe-slider {
+            width: 200px;
+            height: 6px;
+            border-radius: 3px;
+            background: linear-gradient(to right, rgba(33, 160, 149, 0.3), rgba(33, 160, 149, 0.6));
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            cursor: pointer;
+        }
+
+        .timeframe-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #21a095;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(33, 160, 149, 0.6);
+            border: 2px solid #00d9ff;
+        }
+
+        .timeframe-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #21a095;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(33, 160, 149, 0.6);
+            border: 2px solid #00d9ff;
+        }
+
+        .timeframe-slider:hover::-webkit-slider-thumb {
+            background: #00d9ff;
+            box-shadow: 0 0 12px rgba(0, 217, 255, 0.8);
+        }
+
+        .timeframe-slider:hover::-moz-range-thumb {
+            background: #00d9ff;
+            box-shadow: 0 0 12px rgba(0, 217, 255, 0.8);
+        }
+
+        .timeframe-label {
+            font-size: 0.85rem;
+            color: #00d9ff;
+            font-weight: 600;
+            margin-left: 12px;
+            min-width: 60px;
+        }
+
+        select option {
+            background: #0f1419;
+            color: #e0e6f0;
+        }
+
+        .scale-context {
+            padding: 12px 16px;
+            background: rgba(33, 160, 149, 0.1);
+            border: 1px solid rgba(33, 160, 149, 0.2);
+            border-radius: 2px;
+            font-size: 0.75rem;
+            color: #a0a9b8;
+        }
+
+        .scale-context strong {
+            color: #00d9ff;
+        }
+
+        .matrix-wrapper {
+            display: grid;
+            grid-template-columns: 70px 1fr;
+            grid-template-rows: 32px 1fr;
+            gap: 0;
+            margin-bottom: 40px;
+            background: rgba(15, 20, 25, 0.8);
+            border: 1px solid rgba(33, 160, 149, 0.2);
+            border-radius: 2px;
+            overflow: hidden;
+            max-width: calc(100vw - 60px);
+        }
+
+        .axis-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(26, 31, 46, 0.6);
+            color: #7a8195;
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid rgba(33, 160, 149, 0.1);
+        }
+
+        .corner {
+            grid-column: 1;
+            grid-row: 1;
+        }
+
+        .x-axis {
+            grid-column: 2;
+            grid-row: 1;
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+        }
+
+        .x-label {
+            border-right: 1px solid rgba(33, 160, 149, 0.05);
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+        }
+
+        .y-axis {
+            grid-column: 1;
+            grid-row: 2;
+            display: grid;
+            grid-template-rows: repeat(10, 1fr);
+            border-right: 1px solid rgba(33, 160, 149, 0.1);
+        }
+
+        .y-label {
+            border-bottom: 1px solid rgba(33, 160, 149, 0.05);
+        }
+
+        .matrix-grid {
+            grid-column: 2;
+            grid-row: 2;
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(10, 1fr);
+            gap: 0;
+            min-width: 0;
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(33, 160, 149, 0.1);
+            padding: 4px;
+            position: relative;
+            background: rgba(15, 20, 25, 0.9);
+            transition: all 0.2s ease;
+            cursor: pointer;
+            min-width: 0;
+            min-height: 0;
+        }
+
+        .cell:hover {
+            background: rgba(33, 160, 149, 0.1);
+            border-color: rgba(33, 160, 149, 0.3);
+        }
+
+        .cell-canvas {
+            width: 100%;
+            height: 60%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 2px;
+        }
+
+        .cell-label {
+            font-size: 0.45rem;
+            color: #7a8195;
+            text-align: center;
+            line-height: 0.9;
+            height: 40%;
+            overflow: hidden;
+        }
+
+        .cell-name {
+            font-weight: 600;
+            color: #00d9ff;
+            font-size: 0.5rem;
+        }
+
+        .cell-desc {
+            font-size: 0.4rem;
+            color: #7a8195;
+        }
+
+        .cell.q1 { background: rgba(0, 217, 255, 0.05); }
+        .cell.q2 { background: rgba(33, 160, 149, 0.05); }
+        .cell.q3 { background: rgba(180, 140, 100, 0.05); }
+        .cell.q4 { background: rgba(251, 113, 133, 0.05); }
+
+        .cell.key-state {
+            border: 2px solid rgba(255, 200, 0, 0.5);
+            box-shadow: 0 0 8px rgba(255, 200, 0, 0.2);
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .interpretations {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 40px;
+        }
+
+        .interpretation-card {
+            background: rgba(26, 31, 46, 0.9);
+            border: 1px solid rgba(33, 160, 149, 0.2);
+            border-radius: 2px;
+            padding: 20px;
+        }
+
+        .interpretation-card h3 {
+            font-family: 'Syne', sans-serif;
+            font-size: 0.9rem;
+            color: #21a095;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .interpretation-card p {
+            font-size: 0.8rem;
+            color: #a0a9b8;
+            line-height: 1.6;
+        }
+
+        .fractal-insight {
+            margin-top: 40px;
+            padding: 24px;
+            background: rgba(15, 20, 25, 0.8);
+            border: 2px solid rgba(33, 160, 149, 0.3);
+            border-radius: 2px;
+        }
+
+        .fractal-insight h2 {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.1rem;
+            color: #00d9ff;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .fractal-insight p {
+            font-size: 0.8rem;
+            color: #a0a9b8;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .fractal-insight strong {
+            color: #21a095;
+        }
+
+        .scale-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .scale-param {
+            padding: 12px;
+            background: rgba(33, 160, 149, 0.08);
+            border: 1px solid rgba(33, 160, 149, 0.15);
+            border-radius: 2px;
+            font-size: 0.75rem;
+        }
+
+        .scale-param strong {
+            color: #00d9ff;
+            display: block;
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Fractal Phatness Matrix</h1>
+            <p class="subtitle">Scale-Dependent Geometry Atlas</p>
+            <p class="tagline">Same geometry, different gravity. Select a timeframe to re-anchor normalization and shift state interpretations.</p>
+        </header>
+
+        <div class="controls">
+            <div class="control-group">
+                <label class="control-label">Timeframe:</label>
+                <input 
+                    type="range" 
+                    id="timeframeSlider" 
+                    min="0" 
+                    max="8" 
+                    value="7"
+                    class="timeframe-slider"
+                >
+                <span id="timeframeLabel" class="timeframe-label">1 Day</span>
+            </div>
+            <div class="scale-context">
+                <strong id="contextLabel">1D Scale:</strong> <span id="contextText">Structural anchors. Walls here represent major institutional positions defending support/resistance.</span>
+            </div>
+        </div>
+
+        <!-- 5×5 Matrix -->
+        <div class="matrix-wrapper">
+            <div class="axis-label corner">Price Vol ↑ / L2 →</div>
+            <div class="axis-label x-axis">
+                <div class="axis-label x-label">1: Hollow</div>
+                <div class="axis-label x-label">2</div>
+                <div class="axis-label x-label">3</div>
+                <div class="axis-label x-label">4</div>
+                <div class="axis-label x-label">5: Mid</div>
+                <div class="axis-label x-label">6</div>
+                <div class="axis-label x-label">7</div>
+                <div class="axis-label x-label">8</div>
+                <div class="axis-label x-label">9</div>
+                <div class="axis-label x-label">10: Phat</div>
+            </div>
+            <div class="axis-label y-axis">
+                <div class="axis-label y-label">10: Climax</div>
+                <div class="axis-label y-label">9</div>
+                <div class="axis-label y-label">8</div>
+                <div class="axis-label y-label">7</div>
+                <div class="axis-label y-label">6</div>
+                <div class="axis-label y-label">5: Mid</div>
+                <div class="axis-label y-label">4</div>
+                <div class="axis-label y-label">3</div>
+                <div class="axis-label y-label">2</div>
+                <div class="axis-label y-label">1: Anemic</div>
+            </div>
+
+            <div class="matrix-grid" id="matrixGrid"></div>
+        </div>
+
+        <!-- Scale-Dependent Interpretations -->
+        <div class="interpretations" id="interpretationsContainer"></div>
+
+        <!-- Fractal Insight -->
+        <div class="fractal-insight">
+            <h2>⚡ Fractal Principle: Same Geometry, Different Gravity</h2>
+            <p>The canonical state at coordinates (5,5) = "The Engine" exists at every timeframe. But its meaning shifts:</p>
+            <p><strong>1-Second Scale (Micro):</strong> Scalp Conviction. High-frequency filler volume; immediate path of least resistance for algos.</p>
+            <p><strong>1-Hour Scale (Tactical):</strong> Intra-day Trend Health. Used for timing entries/exits within a session.</p>
+            <p><strong>1-Day Scale (Structural):</strong> Definitive Wall. Large funds are likely defending positions here.</p>
+            <p><strong>1-Week Scale (Macro):</strong> Systemic Accumulation Zone. "Phatness" represents capital flows at the institutional level.</p>
+            <p style="margin-top: 16px;">The Selector re-anchors <strong>what constitutes "Max Phatness"</strong> for each scale. A 10K-contract depth spike is "Level 10" on seconds but "Level 2" on a weekly chart where millions are resting.</p>
+            
+            <div class="scale-info">
+                <div class="scale-param">
+                    <strong>Lookback Window</strong>
+                    <span id="lookbackInfo">288 bars (1 day)</span>
+                </div>
+                <div class="scale-param">
+                    <strong>Normalization Anchor</strong>
+                    <span id="anchorInfo">Session Average</span>
+                </div>
+                <div class="scale-param">
+                    <strong>Decay Rate</strong>
+                    <span id="decayInfo">Standard</span>
+                </div>
+                <div class="scale-param">
+                    <strong>Coherence Threshold</strong>
+                    <span id="thresholdInfo">±15% body overlap</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const timeframeOrder = ['1s', '5s', '1m', '5m', '15m', '1h', '4h', '1d', '1w'];
+        
+        const timeframeConfig = {
+            '1s': {
+                contextLabel: 'Scalp Scale: Micro-absorption events. An Engine here is just a brief burst of HFT activity.',
+                lookback: '300 ticks (5 min)',
+                anchor: 'Local Peak (High Sensitivity)',
+                decay: 'Fast (cancelled orders clear immediately)',
+                threshold: '±5% (tight alignment)',
+                interpretations: {
+                    'engine': 'Stop Run Filler. Quick volume into thin air.',
+                    'slip': 'Panic Spike. Likely to snap back within seconds.',
+                    'hidden_floor': 'Micro-Accumulation. Silent order flow.',
+                    'apathy': 'Weightless. Next tick determines direction.'
+                }
+            },
+            '5s': {
+                contextLabel: '5-Second Scale: Sub-minute behavior. Detects liquidity jitters and order flow imbalances.',
+                lookback: '300 ticks (25 min)',
+                anchor: 'Local Peak',
+                decay: 'Fast',
+                threshold: '±8%',
+                interpretations: {
+                    'engine': 'Brief Conviction. Algos consolidating.',
+                    'slip': 'Flash Crash Risk. Volume into void.',
+                    'hidden_floor': 'Smart Money Probe. Testing absorption.',
+                    'apathy': 'Drift. Waiting for catalyst.'
+                }
+            },
+            '1m': {
+                contextLabel: 'Intra-Minute Scale: Tactical range trading. Detects momentum shifts within a bar.',
+                lookback: '1440 bars (1 day)',
+                anchor: 'Standard Deviation (Z-Score)',
+                decay: 'Moderate',
+                threshold: '±10%',
+                interpretations: {
+                    'engine': 'Momentum Build. Strong directional push.',
+                    'slip': 'Overextension. Vulnerable to reversal.',
+                    'hidden_floor': 'Accumulation In Progress. Watch for breakout.',
+                    'apathy': 'Coiled Spring. Next move breaks decisively.'
+                }
+            },
+            '5m': {
+                contextLabel: '5-Minute Scale: Short-term swing trading. Session-relative normalization.',
+                lookback: '288 bars (1 day)',
+                anchor: 'Session Average',
+                decay: 'Moderate',
+                threshold: '±12%',
+                interpretations: {
+                    'engine': 'Trend Confirmation. Healthy momentum structure.',
+                    'slip': 'Warning Sign. Loss of conviction.',
+                    'hidden_floor': 'Major Support Building. Institutional demand.',
+                    'apathy': 'Consolidation Zone. Breakout Imminent.'
+                }
+            },
+            '15m': {
+                contextLabel: '15-Minute Scale: Intra-day swing. Major trend identification.',
+                lookback: '96 bars (1 day)',
+                anchor: 'Session Average',
+                decay: 'Standard',
+                threshold: '±15%',
+                interpretations: {
+                    'engine': 'Strong Trend. Conviction High.',
+                    'slip': 'Potential Top. Effort/Result Divergence.',
+                    'hidden_floor': 'Absorption Zone. Accumulation Signal.',
+                    'apathy': 'Transition State. Major Move Upcoming.'
+                }
+            },
+            '1h': {
+                contextLabel: 'Hourly Scale: Structural Anchors. Half-day and full-day trend formation.',
+                lookback: '24 bars (1 day)',
+                anchor: 'Daily Average',
+                decay: 'Standard',
+                threshold: '±15%',
+                interpretations: {
+                    'engine': 'Institutional Conviction. Major trend underway.',
+                    'slip': 'Regime Breakdown. Risk of capitulation.',
+                    'hidden_floor': 'Major Support Level. Institutional Buyers.',
+                    'apathy': 'Pre-Regime Shift. Volatility Consolidation.'
+                }
+            },
+            '4h': {
+                contextLabel: '4-Hour Scale: Daily Swing Foundation. Multi-day trend anchors.',
+                lookback: '6 bars (1 day)',
+                anchor: 'Weekly Average',
+                decay: 'Slow (Ghost Scars)',
+                threshold: '±18%',
+                interpretations: {
+                    'engine': 'Strong Structural Trend. Major capital flows.',
+                    'slip': 'Volatility Spike Into Void. Flash crash risk.',
+                    'hidden_floor': 'Major Accumulation. Weeks of Buying.',
+                    'apathy': 'Coil Phase. Breakout Weeks Away.'
+                }
+            },
+            '1d': {
+                contextLabel: 'Daily Scale: Structural Anchors. Walls here represent major institutional positions defending support/resistance.',
+                lookback: '252 bars (1 year)',
+                anchor: 'Yearly Percentile Rank',
+                decay: 'Very Slow (Institutional Memory)',
+                threshold: '±20%',
+                interpretations: {
+                    'engine': 'Systemic Bull Phase. Multi-week conviction.',
+                    'slip': 'Fundamental Regime Shift. Permanent liquidity retreat.',
+                    'hidden_floor': 'Multi-Month Accumulation. Pivot Point.',
+                    'apathy': 'Transition Quarter. Major Cycle Shift Imminent.'
+                }
+            },
+            '1w': {
+                contextLabel: 'Weekly Scale: Macro Cycle Foundations. Phatness here represents capital flows at the systemic level. Major turning points.',
+                lookback: '52 bars (1 year)',
+                anchor: 'Yearly Percentile',
+                decay: 'Glacial (Years)',
+                threshold: '±25%',
+                interpretations: {
+                    'engine': 'Bull Market Anchor. Years-long trends.',
+                    'slip': 'Market Crash. Fundamental breakdown.',
+                    'hidden_floor': 'Generational Accumulation. Major Institutions.',
+                    'apathy': 'Regime Transition. Years-long shifts imminent.'
+                }
+            }
+        };
+
+        const stateData = {
+            // ROW 10: CLIMAX (Highest Price Volume)
+            '10_1': { name: 'Blowout', desc: 'Panic', quad: 'q1' },
+            '10_2': { name: 'Flash Crash', desc: 'Vol Void', quad: 'q1' },
+            '10_3': { name: 'Market Crash', desc: 'Capitulation', quad: 'q1' },
+            '10_4': { name: 'Slip Spike', desc: 'Thin Bid', quad: 'q1' },
+            '10_5': { name: 'The Slip', desc: 'Ghost Trap', quad: 'q1', key: true },
+            '10_6': { name: 'Conviction Gap', desc: 'High Vol', quad: 'q2' },
+            '10_7': { name: 'Heavy Engine', desc: 'High Both', quad: 'q2' },
+            '10_8': { name: 'Bull Run', desc: 'Climax', quad: 'q2' },
+            '10_9': { name: 'The Engine', desc: 'Full Conviction', quad: 'q2', key: true },
+            '10_10': { name: 'Institutional Buy', desc: 'Phat Climb', quad: 'q2' },
+            '9_1': { name: 'Liquidation', desc: 'Panic Low', quad: 'q1' },
+            '9_2': { name: 'Gap Down', desc: 'Vol Drop', quad: 'q1' },
+            '9_3': { name: 'Falling Knife', desc: 'Fast Drop', quad: 'q1' },
+            '9_4': { name: 'Fear Spike', desc: 'Hollow', quad: 'q1' },
+            '9_5': { name: 'Exhaustion', desc: 'Thin L2', quad: 'q1' },
+            '9_6': { name: 'Momentum', desc: 'Building', quad: 'q2' },
+            '9_7': { name: 'Growing', desc: 'Trend Up', quad: 'q2' },
+            '9_8': { name: 'Breakout', desc: 'Trending', quad: 'q2' },
+            '9_9': { name: 'Rally', desc: 'High Energy', quad: 'q2' },
+            '9_10': { name: 'Surge', desc: 'Phat Rise', quad: 'q2' },
+            '8_1': { name: 'Shock Drop', desc: 'Vol Panic', quad: 'q1' },
+            '8_2': { name: 'Sell Vol', desc: 'Dumping', quad: 'q1' },
+            '8_3': { name: 'Unwind', desc: 'Liquidation', quad: 'q1' },
+            '8_4': { name: 'Flush Run', desc: 'Thin Depth', quad: 'q1' },
+            '8_5': { name: 'Weakness', desc: 'Selling', quad: 'q1' },
+            '8_6': { name: 'Strength', desc: 'Buying Vol', quad: 'q2' },
+            '8_7': { name: 'Trend Form', desc: 'Direction', quad: 'q2' },
+            '8_8': { name: 'Push', desc: 'Directional', quad: 'q2' },
+            '8_9': { name: 'Strong Trend', desc: 'Conviction', quad: 'q2' },
+            '8_10': { name: 'Institutional', desc: 'Major Buy', quad: 'q2' },
+            '7_1': { name: 'Sharp Drop', desc: 'Vol Shock', quad: 'q1' },
+            '7_2': { name: 'Heavy Sell', desc: 'Volume', quad: 'q1' },
+            '7_3': { name: 'Distribution', desc: 'Selling', quad: 'q1' },
+            '7_4': { name: 'Pressure', desc: 'Downside', quad: 'q1' },
+            '7_5': { name: 'Bearish Vol', desc: 'High Pressure', quad: 'q1' },
+            '7_6': { name: 'Bullish Vol', desc: 'High Demand', quad: 'q2' },
+            '7_7': { name: 'Building Trend', desc: 'Forming', quad: 'q2' },
+            '7_8': { name: 'Trend Up', desc: 'Momentum', quad: 'q2' },
+            '7_9': { name: 'Bull Strength', desc: 'Confident', quad: 'q2' },
+            '7_10': { name: 'Big Buy', desc: 'Institutional', quad: 'q2' },
+            '6_1': { name: 'Heavy Down', desc: 'Vol Down', quad: 'q1' },
+            '6_2': { name: 'Selling Fest', desc: 'Bearish', quad: 'q1' },
+            '6_3': { name: 'Heavy Sell Off', desc: 'Distribution', quad: 'q1' },
+            '6_4': { name: 'Down Pressure', desc: 'Bearish', quad: 'q1' },
+            '6_5': { name: 'Heavy Weakness', desc: 'Vol Pressure', quad: 'q1' },
+            '6_6': { name: 'Heavy Strength', desc: 'Vol Demand', quad: 'q2' },
+            '6_7': { name: 'Strong Form', desc: 'Trend Setup', quad: 'q2' },
+            '6_8': { name: 'Strong Trend', desc: 'Momentum', quad: 'q2' },
+            '6_9': { name: 'Bull Climax', desc: 'High Conviction', quad: 'q2' },
+            '6_10': { name: 'Major Rally', desc: 'Phat Buy', quad: 'q2' },
+            '5_1': { name: 'Moderate Down', desc: 'Medium Vol', quad: 'q1' },
+            '5_2': { name: 'Selling', desc: 'Medium Vol', quad: 'q1' },
+            '5_3': { name: 'Mild Dist', desc: 'Gradual', quad: 'q1' },
+            '5_4': { name: 'Thin Gap', desc: 'High Vol', quad: 'q1' },
+            '5_5': { name: 'Climax', desc: 'Mixed', quad: 'mixed' },
+            '5_6': { name: 'Rise', desc: 'Building', quad: 'q2' },
+            '5_7': { name: 'Moderate Up', desc: 'Vol Up', quad: 'q2' },
+            '5_8': { name: 'Buying', desc: 'Medium Vol', quad: 'q2' },
+            '5_9': { name: 'Bull Phase', desc: 'Growing', quad: 'q2' },
+            '5_10': { name: 'Ascent', desc: 'Climbing', quad: 'q2' },
+            '4_1': { name: 'Fade Down', desc: 'Light Vol', quad: 'q1' },
+            '4_2': { name: 'Mild Sell', desc: 'Light Vol', quad: 'q1' },
+            '4_3': { name: 'Soft Down', desc: 'Drifting', quad: 'mixed' },
+            '4_4': { name: 'Volume Run', desc: 'Mixed', quad: 'mixed' },
+            '4_5': { name: 'Strong', desc: 'Balanced', quad: 'mixed' },
+            '4_6': { name: 'Building', desc: 'Growing', quad: 'mixed' },
+            '4_7': { name: 'Vol Up', desc: 'Increasing', quad: 'q2' },
+            '4_8': { name: 'Mild Buy', desc: 'Light Vol', quad: 'q2' },
+            '4_9': { name: 'Momentum', desc: 'Growing', quad: 'q2' },
+            '4_10': { name: 'Steady Rise', desc: 'Climbing', quad: 'q2' },
+            '3_1': { name: 'Drift Low', desc: 'Hollow', quad: 'q3' },
+            '3_2': { name: 'Wander', desc: 'Light', quad: 'q3' },
+            '3_3': { name: 'Coil', desc: 'Spring Coil', quad: 'q3' },
+            '3_4': { name: 'Choppy', desc: 'Mixed', quad: 'mixed' },
+            '3_5': { name: 'Coherence', desc: 'Balanced', quad: 'mixed', key: true },
+            '3_6': { name: 'Stable', desc: 'Steady', quad: 'mixed' },
+            '3_7': { name: 'Transition', desc: 'Forming', quad: 'mixed' },
+            '3_8': { name: 'Grind', desc: 'Steady', quad: 'q4' },
+            '3_9': { name: 'Sticky', desc: 'Resistant', quad: 'q4' },
+            '3_10': { name: 'Anchored', desc: 'Support', quad: 'q4' },
+            '2_1': { name: 'Thin Void', desc: 'Weightless', quad: 'q3' },
+            '2_2': { name: 'Apathy', desc: 'Light', quad: 'q3' },
+            '2_3': { name: 'Lull', desc: 'Quiet', quad: 'q3' },
+            '2_4': { name: 'Absorption', desc: 'Quiet', quad: 'q4' },
+            '2_5': { name: 'Neutral', desc: 'Low Activity', quad: 'mixed' },
+            '2_6': { name: 'Silent Bid', desc: 'Buyers', quad: 'q4' },
+            '2_7': { name: 'Accumulation', desc: 'Quiet', quad: 'q4' },
+            '2_8': { name: 'Building Wall', desc: 'Orders', quad: 'q4' },
+            '2_9': { name: 'Heavy Wall', desc: 'Resistance', quad: 'q4' },
+            '2_10': { name: 'Major Support', desc: 'Anchored', quad: 'q4' },
+            '1_1': { name: 'Void', desc: 'Weightless', quad: 'q3' },
+            '1_2': { name: 'Drift', desc: 'Apathy', quad: 'q3' },
+            '1_3': { name: 'Coil', desc: 'Spring', quad: 'q3' },
+            '1_4': { name: 'Silent', desc: 'Orders', quad: 'q4' },
+            '1_5': { name: 'Hidden Trap', desc: 'Danger', quad: 'q4' },
+            '1_6': { name: 'Silent Buyer', desc: 'Accumulating', quad: 'q4' },
+            '1_7': { name: 'Absorption', desc: 'Quiet', quad: 'q4' },
+            '1_8': { name: 'Wall Build', desc: 'Resting', quad: 'q4' },
+            '1_9': { name: 'Hidden Floor', desc: 'Accumulation', quad: 'q4', key: true },
+            '1_10': { name: 'Institutional Bid', desc: 'Major Buyers', quad: 'q4' }
+        };
+
+
+        function renderMatrix(timeframe) {
+            const matrixGrid = document.getElementById('matrixGrid');
+            matrixGrid.innerHTML = '';
+            
+            for (let y = 10; y >= 1; y--) {
+                for (let x = 1; x <= 10; x++) {
+                    const key = `${y}_${x}`;
+                    const state = stateData[key] || { name: `(${y},${x})`, desc: 'State', quad: 'mixed' };
+                    
+                    const cell = document.createElement('div');
+                    cell.className = `cell ${state.quad} ${state.key ? 'key-state' : ''}`;
+                    
+                    cell.innerHTML = `
+                        <div class="cell-canvas">
+                            ${renderCandle(y, x, timeframe)}
+                        </div>
+                        <div class="cell-label">
+                            <div class="cell-name">${state.name}</div>
+                            <div class="cell-desc">${state.desc}</div>
+                        </div>
+                    `;
+                    
+                    matrixGrid.appendChild(cell);
+                }
+            }
+        }
+
+        function updateInterpretations(timeframe) {
+            const config = timeframeConfig[timeframe];
+            const container = document.getElementById('interpretationsContainer');
+            container.innerHTML = '';
+
+            const keyStates = [
+                { coord: '5_5', name: 'The Engine (5,5)', key: 'engine' },
+                { coord: '5_1', name: 'The Slip (5,1)', key: 'slip' },
+                { coord: '1_5', name: 'Hidden Floor (1,5)', key: 'hidden_floor' },
+                { coord: '3_3', name: 'Coherence (3,3)', key: 'apathy' }
+            ];
+
+            keyStates.forEach(state => {
+                const card = document.createElement('div');
+                card.className = 'interpretation-card';
+                card.innerHTML = `
+                    <h3>${state.name}</h3>
+                    <p>${config.interpretations[state.key]}</p>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function updateScaleInfo(timeframe) {
+            const config = timeframeConfig[timeframe];
+            document.getElementById('lookbackInfo').textContent = config.lookback;
+            document.getElementById('anchorInfo').textContent = config.anchor;
+            document.getElementById('decayInfo').textContent = config.decay;
+            document.getElementById('thresholdInfo').textContent = config.threshold;
+            
+            // Update context message - use specific elements
+            document.getElementById('contextLabel').textContent = timeframe.toUpperCase() + ' Scale:';
+            document.getElementById('contextText').textContent = config.contextLabel;
+        }
+
+        function generateCandleStates(priceVol, l2Depth, timeframe) {
+            // KEY INSIGHT: Price candle = work done DURING the interval
+            // Ghost candle = state of book AT START of interval
+            // Their divergence is the alpha signal
+            
+            // Base price candle geometry
+            const priceWidthPct = 20 + (priceVol / 5) * 60;  // Volume = width
+            
+            // CRITICAL: Add stochasticity to candle heights
+            // Sometimes a LOT of volume moves price only a little (pancake potential)
+            // Sometimes minimal volume moves price dramatically (vacuum spike)
+            const heightRandomness = Math.random();
+            let priceHeightPct;
+            
+            if (heightRandomness < 0.3) {
+                // 30% chance: PANCAKE - High volume, minimal price movement
+                priceHeightPct = 8 + Math.random() * 15;  // Very flat
+            } else if (heightRandomness < 0.6) {
+                // 30% chance: NORMAL - Balanced
+                priceHeightPct = 40 + Math.random() * 40;
+            } else {
+                // 40% chance: SPIKE - High candle relative to width (vacuum move)
+                priceHeightPct = 60 + Math.random() * 35;
+            }
+            
+            // Ghost candle: SNAPSHOT of book state (NOT averaging)
+            // Should diverge from price to show discrepancy
+            const ghostWidthPct = 20 + (l2Depth / 5) * 60;
+            
+            // Ghost HEIGHT: how "thick" the order placement is at specific level
+            // Should often differ from price movement
+            const ghostHeightPct = 30 + Math.random() * 50;
+            
+            // WICKS: These are critical
+            // Price wicks: show rejected reality (trades that couldn't hold)
+            const priceUpperWickLength = (priceVol < 2) ? Math.random() * 15 : Math.random() * 8;
+            const priceLowerWickLength = (priceVol < 2) ? Math.random() * 15 : Math.random() * 8;
+            
+            // Ghost wicks: show structural guardrails (depth far from spread)
+            // Larger ghost depths = longer wicks (orders sitting away from mid)
+            const ghostWickLength = (l2Depth > 3) ? 12 + Math.random() * 15 : 4 + Math.random() * 8;
+            
+            // Coherence: are price and ghost in the same "story"?
+            // Low = divergence = opportunity
+            const widthDivergence = Math.abs(priceWidthPct - ghostWidthPct) / Math.max(priceWidthPct, ghostWidthPct);
+            const heightDivergence = Math.abs(priceHeightPct - ghostHeightPct) / Math.max(priceHeightPct, ghostHeightPct);
+            const totalDivergence = (widthDivergence + heightDivergence) / 2;
+            
+            // Extract threshold as number
+            const config = timeframeConfig[timeframe];
+            const thresholdMatch = config.threshold.match(/\d+/);
+            const thresholdNum = thresholdMatch ? parseInt(thresholdMatch[0]) : 15;
+            
+            // CRITICAL: Price and Ghost colors must be AUTONOMOUS
+            // They represent different signals and should diverge to show structural friction
+            
+            // PRICE COLOR: Based on execution pressure (volume vs depth ratio)
+            const volumeDepthRatio = priceVol / l2Depth;
+            let priceBias;  // 'bullish', 'bearish', or 'neutral'
+            if (volumeDepthRatio < 0.8) {
+                priceBias = 'bullish';  // More infrastructure than work = accumulation
+            } else if (volumeDepthRatio > 1.2) {
+                priceBias = 'bearish';  // More work than infrastructure = distribution
+            } else {
+                priceBias = 'neutral';
+            }
+            
+            // GHOST COLOR: Based on ORDER BOOK IMBALANCE (independent from price)
+            // This simulates bid/ask depth asymmetry, independent of execution
+            // Higher l2Depth values tend toward better liquidity (more balanced)
+            // Lower l2Depth values can be bid-heavy or ask-heavy (asymmetric)
+            const bookImbalance = Math.sin(l2Depth * 0.7 + priceVol * 0.3) * (priceHeightPct / 100);
+            let ghostBias;  // 'bullish', 'bearish', or 'neutral'
+            if (bookImbalance < -0.3) {
+                ghostBias = 'bullish';  // Bid-heavy = buyers ready
+            } else if (bookImbalance > 0.3) {
+                ghostBias = 'bearish';  // Ask-heavy = sellers ready
+            } else {
+                ghostBias = 'neutral';
+            }
+            
+            return {
+                priceWidthPct,
+                priceHeightPct,
+                priceUpperWickLength,
+                priceLowerWickLength,
+                ghostWidthPct,
+                ghostHeightPct,
+                ghostWickLength,
+                isCoherent: totalDivergence * 100 < thresholdNum,
+                divergence: totalDivergence,
+                isPancake: priceHeightPct < 20,
+                priceBias,   // NEW: independent price direction
+                ghostBias    // NEW: independent ghost/L2 direction
+            };
+        }
+
+        function renderCandle(priceVol, l2Depth, timeframe) {
+            const state = generateCandleStates(priceVol, l2Depth, timeframe);
+            
+            // Opacity scales with timeframe decay
+            const decayMap = {
+                '1s': 0.1, '5s': 0.12, '1m': 0.15, '5m': 0.18, '15m': 0.2,
+                '1h': 0.22, '4h': 0.25, '1d': 0.25, '1w': 0.3
+            };
+            const ghostOpacity = decayMap[timeframe] || 0.2;
+            
+            // CORRECTED: Price and Ghost colors are now AUTONOMOUS
+            // Price reflects execution pressure; Ghost reflects order book imbalance
+            // This creates divergence zones where the real alpha lives
+            
+            // Price color based on priceBias
+            let priceColor;
+            if (state.priceBias === 'bullish') {
+                priceColor = '#21a095';  // Teal
+            } else if (state.priceBias === 'bearish') {
+                priceColor = '#fb7185';  // Pink/red
+            } else {
+                priceColor = '#7a8195';  // Gray/neutral
+            }
+            
+            // Ghost color based on ghostBias (INDEPENDENT)
+            let ghostColor;
+            if (state.ghostBias === 'bullish') {
+                ghostColor = '#00d9ff';  // Cyan/teal
+            } else if (state.ghostBias === 'bearish') {
+                ghostColor = '#fb7185';  // Pink/red
+            } else {
+                ghostColor = '#a0a9b8';  // Gray/neutral
+            }
+            
+            const centerX = 50;
+            const centerY = 50;
+
+            return `
+                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100%;">
+                    <!-- GHOST CANDLE (Snapshot of book at start) -->
+                    <!-- Ghost body -->
+                    <rect 
+                        x="${centerX - state.ghostWidthPct/2}" 
+                        y="${centerY - state.ghostHeightPct/2}" 
+                        width="${state.ghostWidthPct}" 
+                        height="${state.ghostHeightPct}"
+                        fill="${ghostColor}" 
+                        fill-opacity="${ghostOpacity * 0.8}"
+                        stroke="${ghostColor}" 
+                        stroke-width="0.5"
+                    />
+                    <!-- Ghost upper wick (structural guardrail above) -->
+                    <line 
+                        x1="${centerX}" 
+                        y1="${centerY - state.ghostHeightPct/2}" 
+                        x2="${centerX}" 
+                        y2="${centerY - state.ghostHeightPct/2 - state.ghostWickLength}"
+                        stroke="${ghostColor}" 
+                        stroke-width="0.3" 
+                        opacity="0.6"
+                    />
+                    <!-- Ghost lower wick (structural guardrail below) -->
+                    <line 
+                        x1="${centerX}" 
+                        y1="${centerY + state.ghostHeightPct/2}" 
+                        x2="${centerX}" 
+                        y2="${centerY + state.ghostHeightPct/2 + state.ghostWickLength}"
+                        stroke="${ghostColor}" 
+                        stroke-width="0.3" 
+                        opacity="0.6"
+                    />
+                    
+                    <!-- PRICE CANDLE (Work done during interval) -->
+                    <!-- Price body -->
+                    <rect 
+                        x="${centerX - state.priceWidthPct/2}" 
+                        y="${centerY - state.priceHeightPct/2}" 
+                        width="${state.priceWidthPct}" 
+                        height="${state.priceHeightPct}"
+                        fill="${priceColor}" 
+                        fill-opacity="0.65"
+                        stroke="${priceColor}" 
+                        stroke-width="0.7"
+                    />
+                    <!-- Price upper wick (rejected reality above) -->
+                    <line 
+                        x1="${centerX}" 
+                        y1="${centerY - state.priceHeightPct/2}" 
+                        x2="${centerX}" 
+                        y2="${centerY - state.priceHeightPct/2 - state.priceUpperWickLength}"
+                        stroke="${priceColor}" 
+                        stroke-width="0.5"
+                    />
+                    <!-- Price lower wick (rejected reality below) -->
+                    <line 
+                        x1="${centerX}" 
+                        y1="${centerY + state.priceHeightPct/2}" 
+                        x2="${centerX}" 
+                        y2="${centerY + state.priceHeightPct/2 + state.priceLowerWickLength}"
+                        stroke="${priceColor}" 
+                        stroke-width="0.5"
+                    />
+                    
+                    <!-- DIVERGENCE INDICATOR: Thin line showing mismatch -->
+                    ${state.divergence > 0.3 ? `
+                        <circle cx="5" cy="5" r="1.5" fill="${state.divergence > 0.5 ? '#ffc800' : '#00d9ff'}" opacity="0.7"/>
+                    ` : ''}
+                </svg>
+            `;
+        }
+
+        document.getElementById('timeframeSlider').addEventListener('input', (e) => {
+            const index = parseInt(e.target.value);
+            const timeframe = timeframeOrder[index];
+            
+            // Update label
+            document.getElementById('timeframeLabel').textContent = timeframe.toUpperCase();
+            
+            renderMatrix(timeframe);
+            updateInterpretations(timeframe);
+            updateScaleInfo(timeframe);
+        });
+
+        // Initial render at index 7 (1d)
+        const initialTimeframe = timeframeOrder[7];
+        renderMatrix(initialTimeframe);
+        updateInterpretations(initialTimeframe);
+        updateScaleInfo(initialTimeframe);
+    </script>
+</body>
+</html>
